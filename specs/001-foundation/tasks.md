@@ -35,6 +35,6 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T001-04`.
 - Entrega. Ejecutar `forge lint`, build y los pasos oficiales de despliegue e instalación development. Guardar evidencia.
 - Verificación. Ejecutar [CT001-05](tests.md#ct001-05) y guardar evidencia de [AC001-05](acceptance.md#ac001-05).
-- Estado. Pendiente de confirmar autenticación Forge, registrar la app y verificar Jira development.
+- Estado. Sesión de Forge confirmada. Registro de la app y prueba en Jira development pendientes.
 
 [Plan](plan.md) · [Plantilla de tarea](../../docs/templates/TASK.md).

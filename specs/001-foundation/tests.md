@@ -36,8 +36,8 @@ Windows, Node.js 22.23.4, npm 10.9.9 y Forge CLI 16.0.0. El manifiesto solicita 
 
 | Caso | Comando o acción | Resultado observado |
 | --- | --- | --- |
-| CT001-01 | `node --version`, `npm --version`, `forge --version` y revisión de referencias | Versiones locales verificadas. La disponibilidad efectiva de Jira y Rovo se comprueba en el sitio de desarrollo. |
+| CT001-01 | `node --version`, `npm --version`, `forge --version` y revisión de referencias | Versiones locales verificadas. Forge confirma un sitio demo activo, con vencimiento el 22 de febrero de 2027. La verificación en las interfaces de Jira y Rovo corresponde al ensayo en el sitio. |
 | CT001-02 | `npm ci --offline --ignore-scripts` desde caché y `npm run check` en una copia limpia | Se instalaron 244 dependencias desde el lockfile. ESLint y TypeScript correctos, siete pruebas aprobadas y build de Vite con entrada HTML y rutas relativas a los recursos. El build también pasó en el árbol de trabajo. |
 | CT001-03 | `npm test` | La prueba autorizada usa el proyecto de contexto. Los payloads con otro actor, instalación o proyecto se rechazan antes de llamar a Jira. Prueba en development pendiente. |
 | CT001-04 | `npm test` | Una excepción artificial produce un ID común en resultado y log. La salida omite la excepción, el actor y la instalación. Prueba en development pendiente. |
-| CT001-05 | `forge whoami` y `forge lint` | El CLI requiere iniciar sesión localmente. El lint de Forge exige registrar la app para obtener el ARI. La instalación, la página en Jira y el ensayo de dos identidades siguen pendientes. |
+| CT001-05 | `forge whoami`, `forge developer-spaces list`, `forge site provision` y `forge lint` | Sesión verificada desde el entorno de desarrollo. La cuenta todavía carece de un Developer Space. El lint de Forge exige registrar la app para obtener el ARI. La instalación, la página en Jira y el ensayo de dos identidades siguen pendientes. |

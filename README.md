@@ -39,6 +39,8 @@ El comando ejecuta ESLint, TypeScript, las pruebas unitarias del resolver y el b
 
 ## Prueba en Jira development
 
-Comprobá la sesión del CLI con `forge whoami`. En un sitio de pruebas autorizado, registrá una única app con `forge register` si el manifiesto todavía carece de `app.id`. Con el build generado, corré `forge lint`, `forge deploy -e development` e instalá la app para Jira en ese sitio. Abrí **Control Tower X** desde la navegación de un proyecto y documentá el caso autorizado y el denegado en [pruebas de SDD-001](specs/001-foundation/tests.md).
+Comprobá la sesión del CLI con `forge whoami`. Si el manifiesto todavía carece de `app.id`, ejecutá `forge register 'Control Tower X'` una vez desde la raíz. Elegí un Developer Space destinado al proyecto o crealo si Forge lo solicita. La persona titular revisa y confirma los términos que presenta el CLI. [Registro Forge](https://developer.atlassian.com/platform/forge/cli-reference/register/).
+
+Confirmá un sitio de pruebas autorizado. `forge site provision` recupera o prepara un sitio demo para el desarrollador. Con el build generado, ejecutá `forge lint`, `forge deploy -e development` y, para un sitio demo listo, `forge install -e development --product jira --demo-site`. Abrí **Control Tower X** desde la navegación de un proyecto y documentá el caso autorizado y el denegado en [pruebas de SDD-001](specs/001-foundation/tests.md). [Sitio demo](https://developer.atlassian.com/platform/forge/provision-a-demo-development-site/).
 
 Consultar la [arquitectura](docs/architecture/ARQUITECTURA.md), el [registro de decisiones](docs/decisions/REGISTRO_ADR.md) y las [plantillas](docs/templates/).
