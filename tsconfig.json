@@ -8,8 +8,7 @@
     "strict": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true,
-    "noEmit": true
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src/**/*.ts", "static/control-tower/src/**/*.tsx"]
 }
