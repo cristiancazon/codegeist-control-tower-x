@@ -1,0 +1,7 @@
+/node_modules/
+/static/control-tower/dist/
+/.forge/
+*.log
+*.tsbuildinfo
+.env*
+!.env.example
