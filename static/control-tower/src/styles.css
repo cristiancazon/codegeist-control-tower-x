@@ -97,3 +97,23 @@ button:focus-visible {
   outline: 2px solid var(--ds-border-focused, #0c66e4);
   outline-offset: 2px;
 }
+.demo-bootstrap {
+  margin-top: 20px;
+}
+
+.demo-bootstrap progress {
+  width: 100%;
+}
+
+.demo-confirm {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 12px;
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

@@ -21,7 +21,7 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T002-02`.
 - Entrega. Crear generador unit-testable, manifiesto con claves y validadores de integridad.
 - Verificación. Ejecutar [CT002-03](tests.md#ct002-03) y guardar evidencia de [AC002-03](acceptance.md#ac002-03).
-- Estado. Pendiente.
+- Estado. Verificado localmente el 25 de noviembre de 2026. [Evidencia](tests.md#evidencia-local-del-25-de-noviembre-de-2026).
 
 ### T002-04 · Bootstrap protegido
 

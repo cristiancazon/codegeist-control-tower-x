@@ -2,6 +2,7 @@ import { makeInvoke, view } from '@forge/bridge';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
+import { DemoBootstrap } from './demo-bootstrap';
 import './styles.css';
 
 const invoke = makeInvoke<{ [HEALTH_OPERATION]: () => HealthResponse | undefined }>();
@@ -87,6 +88,7 @@ function App() {
         </div>
         {retryable && <button type="button" onClick={retry}>Reintentar</button>}
       </section>
+      {response?.ok && response.data.status === 'READY' && <DemoBootstrap />}
     </main>
   );
 }

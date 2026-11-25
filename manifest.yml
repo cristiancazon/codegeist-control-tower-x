@@ -8,12 +8,41 @@ modules:
   function:
     - key: project-resolver
       handler: index.handler
+    - key: enq-schema-migrations
+      handler: server/data/migration-events.enqueue
+    - key: run-schema-migrations
+      handler: server/data/migration-events.run
+      timeoutSeconds: 900
+    - key: publish-patagonia
+      handler: server/data/bootstrap/publish.publish
+      timeoutSeconds: 180
+  sql:
+    - key: control-tower-db
+      engine: mysql
+  trigger:
+    - key: initialize-sql-schema
+      function: enq-schema-migrations
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+  consumer:
+    - key: consume-schema-migrations
+      queue: ctx-schema-migrations
+      function: run-schema-migrations
+    - key: consume-patagonia-fixture
+      queue: ctx-fixture-publish
+      function: publish-patagonia
+  scheduledTrigger:
+    - key: retry-schema-migrations
+      function: enq-schema-migrations
+      interval: hour
 resources:
   - key: project-ui
     path: static/control-tower/dist
 permissions:
   scopes:
     - read:jira-work
+    - write:jira-work
 app:
   runtime:
     name: nodejs22.x
