@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Result } from '@forge/sql';
-import { fixtureMarker, JiraBoundaryError, type JiraWorkItem, type JiraWorkItemPage } from '../jira/index.js';
-import type { executeSql, SqlParameter } from '../sql/client.js';
-import { advanceFixtureReconciliation } from './reconciliation.js';
+import { fixtureMarker, JiraBoundaryError, type JiraWorkItem, type JiraWorkItemPage } from '../jira/index';
+import type { executeSql, SqlParameter } from '../sql/client';
+import { advanceFixtureReconciliation } from './reconciliation';
 
 const projectId = '6cc5ef56-59aa-50b8-b049-b8999f86eb1f';
 const otherProjectId = 'e2c73946-067b-57b3-b3f5-0ed15916c7c9';

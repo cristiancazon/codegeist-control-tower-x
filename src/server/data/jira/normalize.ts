@@ -1,4 +1,4 @@
-import { JiraBoundaryError, type JiraIssueIdentity, type JiraWorkItem } from './types.js';
+import { JiraBoundaryError, type JiraIssueIdentity, type JiraWorkItem } from './types';
 
 const JIRA_ID = /^[1-9][0-9]{0,31}$/;
 const ISSUE_KEY = /^[A-Z][A-Z0-9_]{0,39}-[1-9][0-9]{0,31}$/;

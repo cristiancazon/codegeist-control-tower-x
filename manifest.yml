@@ -10,6 +10,8 @@ modules:
       handler: index.handler
     - key: enq-schema-migrations
       handler: server/data/migration-events.enqueue
+    - key: maintain-demo-data
+      handler: server/data/migration-events.maintain
     - key: run-schema-migrations
       handler: server/data/migration-events.run
       timeoutSeconds: 900
@@ -34,7 +36,7 @@ modules:
       function: publish-patagonia
   scheduledTrigger:
     - key: retry-schema-migrations
-      function: enq-schema-migrations
+      function: maintain-demo-data
       interval: hour
 resources:
   - key: project-ui

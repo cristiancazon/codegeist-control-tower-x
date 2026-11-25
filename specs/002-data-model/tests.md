@@ -43,3 +43,11 @@ Por cada caso guardar versión, fecha, entorno, fixture o comandos, resultado es
 | CT002-05 | Dos bases locales con IDs iguales mantienen el acceso separado. Un rol revocado pierde acceso y un snapshot vencido deja de ser publicable con reloj fijo. | Probar dos instalaciones Forge y completar la purga que preserve referencias. |
 
 La carga exige los IDs del sitio y del proyecto en las variables de `development`, una clave de proyecto PED verificada con Jira y autorización del usuario activo. El modelo conserva el estado de planificación del fixture y la identidad del ítem Jira. El estado de workflow de Jira se consulta en el adaptador. [App context de Forge](https://developer.atlassian.com/platform/forge/runtime-reference/app-context-api/) · [Seguridad del contexto](https://developer.atlassian.com/platform/forge/app-context-security/).
+
+### Evidencia en development del 25 de noviembre de 2026
+
+| Caso | Acción | Resultado observado |
+| --- | --- | --- |
+| CT002-01 | Empaquetar y desplegar en `development` con el aviso de versión mayor autorizado. Actualizar la única instalación demo de Jira. | El primer empaquetado encontró imports locales con extensión `.js` sin archivos emitidos. Tras quitar esas extensiones, Forge desplegó la versión mayor 3. La lista de instalaciones confirmó 3 como versión vigente. El registro `data.migrations` mostró `READY` tras la actualización. |
+| CT002-04 | Consultar el plan como administrador de PED, autorizar la carga, pausarla, recargar la página y reanudar. | El proyecto `10202` mostró 0 de 120 al inicio, 6 fases, 80 activos, 15 contratistas y 24 meses. La vista previa recuperó 12 vínculos tras recargar. La carga llegó a 120 de 120 y `demo.publish` registró `COMPLETE` con `mapped: 120`. El envío A-17 se vinculó a `PED-48`. Queda el ensayo con otro proyecto de control. |
+| CT002-05 | Probar la limpieza con `npm run check` en la base local. | Pasaron 39 pruebas. La limpieza por lotes recupera fragmentos vencidos de borradores sintéticos no sellados y conserva el registro padre. Comprueba referencias de escenarios y corridas antes de borrar y conserva snapshots sellados. La purga general y la verificación con dos instalaciones reales siguen pendientes. |

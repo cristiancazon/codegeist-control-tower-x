@@ -4,7 +4,7 @@ import { NeedsAuthenticationError } from '@forge/api';
 import {
   BOOTSTRAP_PERMISSIONS, createForgeJiraProjectAdapter, createJiraProjectAdapter, fixtureMarker, JiraBoundaryError,
   reconcileFixtureTask, type JiraBoundaryErrorCode, type JiraRequest,
-} from './index.js';
+} from './index';
 
 const projectId = '10001';
 const marker = fixtureMarker('WP-048');

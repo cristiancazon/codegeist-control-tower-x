@@ -50,6 +50,8 @@ La carga en Jira requiere autorización del administrador del sitio demo para el
 ```powershell
 forge variables set -e development CTX_DEMO_CLOUD_ID 'id-del-sitio-demo'
 forge variables set -e development CTX_DEMO_JIRA_PROJECT_ID 'id-del-proyecto-ped'
+forge deploy -e development
+forge install --upgrade all -e development --product jira --demo-site
 ```
 
 Abrí **Control Tower X** en PED con una cuenta que pueda administrar el proyecto, ver sus ítems y crearlos. En **Datos de demostración**, revisá el plan de carga de 120 ítems antes de confirmarlo. Podés reanudar una importación desde el mismo destino y la misma cuenta. Si Jira no confirma una creación, el botón de reanudación consulta de nuevo su marcador para recuperar el vínculo. Consultá el [registro de pruebas](specs/002-data-model/tests.md) para ver el estado de la verificación.

@@ -2,12 +2,12 @@ import { NeedsAuthenticationError, route, type Route } from '@forge/api';
 import { performance } from 'node:perf_hooks';
 import {
   isDateOnly, isFixtureMarker, isIssueKey, isJiraId, isRecord, isText, normalizeWorkItem, readIssueIdentity,
-} from './normalize.js';
+} from './normalize';
 import {
   BOOTSTRAP_PERMISSIONS, JiraBoundaryError, type JiraFixtureTaskInput, type JiraIssueIdentity, type JiraPermission,
   type JiraProjectIdentity, type JiraRequest, type JiraSearchOptions, type JiraTaskCreateMetadata,
   type JiraWorkItem, type JiraWorkItemPage,
-} from './types.js';
+} from './types';
 
 const ISSUE_FIELDS = ['project', 'issuetype', 'summary', 'status', 'assignee', 'duedate', 'updated', 'labels'];
 const DEFAULT_INVOCATION_BUDGET_MS = 15_000;

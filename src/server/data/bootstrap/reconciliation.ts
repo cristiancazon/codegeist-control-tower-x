@@ -5,10 +5,10 @@ import {
   type FixtureReconciliation,
   type FixtureReconciliationState,
   type JiraProjectAdapter,
-} from '../jira/index.js';
-import { isFixtureMarker, isJiraId, isRecord, isText, readIssueIdentity } from '../jira/normalize.js';
-import { JiraBoundaryError } from '../jira/types.js';
-import { executeSql } from '../sql/client.js';
+} from '../jira/index';
+import { isFixtureMarker, isJiraId, isRecord, isText, readIssueIdentity } from '../jira/normalize';
+import { JiraBoundaryError } from '../jira/types';
+import { executeSql } from '../sql/client';
 
 const source = 'JIRA_RECONCILE';
 const schemaVersion = 1;

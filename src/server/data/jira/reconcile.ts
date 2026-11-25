@@ -1,6 +1,6 @@
-import type { JiraProjectAdapter } from './adapter.js';
-import { isFixtureMarker, isText, readIssueIdentity } from './normalize.js';
-import { JiraBoundaryError, type JiraIssueIdentity } from './types.js';
+import type { JiraProjectAdapter } from './adapter';
+import { isFixtureMarker, isText, readIssueIdentity } from './normalize';
+import { JiraBoundaryError, type JiraIssueIdentity } from './types';
 
 const MAX_RECONCILIATION_PAGES = 20;
 

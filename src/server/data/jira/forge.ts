@@ -1,7 +1,7 @@
 import api from '@forge/api';
-import { createJiraProjectAdapter } from './adapter.js';
-import { isJiraId, isRecord, isText } from './normalize.js';
-import { JiraBoundaryError } from './types.js';
+import { createJiraProjectAdapter } from './adapter';
+import { isJiraId, isRecord, isText } from './normalize';
+import { JiraBoundaryError } from './types';
 
 export function createForgeJiraProjectAdapter(context: unknown, budgetMs?: number) {
   if (!isRecord(context) || !isText(context.accountId, 128) || context.accountType === 'anonymous') {
