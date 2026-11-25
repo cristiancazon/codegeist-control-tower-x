@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
 import { DemoBootstrap } from './demo-bootstrap';
+import { OverviewDashboard } from './overview';
 import './styles.css';
 
 const invoke = makeInvoke<{ [HEALTH_OPERATION]: () => HealthResponse | undefined }>();
@@ -18,7 +19,7 @@ const statusLabels: Record<HealthStatus, string> = {
   UNAVAILABLE: 'No disponible',
 };
 
-function App() {
+function ForgeConnection() {
   const [attempt, setAttempt] = useState(0);
   const [check, setCheck] = useState<HealthCheck>({ state: 'loading' });
 
@@ -55,8 +56,7 @@ function App() {
   }
 
   return (
-    <main className="page">
-      <h1>Control Tower X</h1>
+    <>
       <section className="connection" aria-labelledby="connection-heading">
         <h2 id="connection-heading">Conexión con Forge</h2>
         <div className="connection-result" role="status" aria-atomic="true">
@@ -89,6 +89,23 @@ function App() {
         {retryable && <button type="button" onClick={retry}>Reintentar</button>}
       </section>
       {response?.ok && response.data.status === 'READY' && <DemoBootstrap />}
+    </>
+  );
+}
+
+function App() {
+  const [hasOpenedTools, setHasOpenedTools] = useState(false);
+  return (
+    <main className="page">
+      <OverviewDashboard />
+      <details className="installation-tools" onToggle={(event) => {
+        if (event.currentTarget.open) {
+          setHasOpenedTools(true);
+        }
+      }}>
+        <summary>Estado de la instalación</summary>
+        {hasOpenedTools && <ForgeConnection />}
+      </details>
     </main>
   );
 }

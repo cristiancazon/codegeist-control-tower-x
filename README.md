@@ -24,7 +24,7 @@ Especificación y paquete SDD de una torre de control inteligente para megaproye
 | [009](specs/009-decisions/spec.md) | Aprobación y escritura correctiva en Jira |
 | [010](specs/010-release/spec.md) | Candidato, ensayo y entrega |
 
-En SDD-001, la página de proyecto de Jira consulta `system.health` y muestra el estado de conexión y el ID de proyecto. El resolver verifica el acceso del usuario actual con Jira. SDD-002 incorpora el modelo de datos y los fixtures de demostración.
+La página del proyecto Jira abre Overview con filtros, indicadores y la cadena de impacto de A-17. **Estado de la instalación** muestra la conexión de Forge y ofrece la carga de demostración a la cuenta administradora habilitada. El panel usa la cuenta activa de Jira y un rol vigente de Control Tower X.
 
 ## Verificación local
 

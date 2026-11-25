@@ -330,7 +330,10 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
     return identity;
   }
 
-  return { projectId, checkPermissions, assertBootstrapPermissions, getProject, getTaskCreateMetadata, searchWorkItems, getWorkItem, createFixtureTask };
+  return {
+    projectId, checkPermissions, assertBrowsePermission: requireBrowsePermission, assertBootstrapPermissions,
+    getProject, getTaskCreateMetadata, searchWorkItems, getWorkItem, createFixtureTask,
+  };
 }
 
 export type JiraProjectAdapter = ReturnType<typeof createJiraProjectAdapter>;
