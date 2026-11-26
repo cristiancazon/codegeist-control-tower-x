@@ -1,3 +1,4 @@
+import { getAppContext } from '@forge/api';
 import type { AsyncEvent } from '@forge/events';
 import { createRunStore, type RunRecord } from './run-store';
 import { loadFuturosSnapshot } from './snapshot';
@@ -10,7 +11,20 @@ export const loadFuturosRunInput = (run: RunRecord) => loadFuturosSnapshot({
 });
 export const futurosWorker = createFuturosWorker({ store: futurosRunStore, loadInput: loadFuturosRunInput });
 
+export function isStagingFuturosBenchmark() {
+  try {
+    return process.env.CTX_STAGING_ADOPT_FIXTURE === 'true' && getAppContext().environmentType === 'STAGING';
+  } catch {
+    return false;
+  }
+}
+
 export function runFuturos(event: AsyncEvent<{ runId: string }>) {
+  if (isStagingFuturosBenchmark()) {
+    return futurosWorker.consume(event.body.runId, (timing) => {
+      console.info(JSON.stringify({ operation: 'futuros.workerTiming', ...timing }));
+    });
+  }
   return futurosWorker.consume(event.body.runId);
 }
 

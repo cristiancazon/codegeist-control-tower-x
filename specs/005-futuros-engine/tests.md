@@ -72,4 +72,29 @@ En Forge 3.6.0, `PLANNER` reintentó en PED las tres corridas vencidas, con el s
 
 La comparación emparejada mostró +14 días y +USD 167.500 para S1 frente a S0, y +4 días y +USD 112.500 para S2 frente a S0. El navegador mostró cada reintento en cola unos 2,1 s después del clic y confirmó la publicación de la repetición de S1 en la comprobación a los 27 s. [Futuros en el proyecto PED](https://one-atlas-wjzw.atlassian.net/jira/software/projects/PED/apps/262d9dea-7d8b-4b70-ab88-f868960c2e09/bde0a6c9-8bb3-4f6c-9440-ac46a5f66b2b).
 
-Queda pendiente el ensayo de staging con 30 admisiones, 20 corridas cálidas de 4.000 muestras y cinco frías medidas aparte. El ensayo registra cola, cálculo, capacidad de persistencia y recuperación ante fallas inducidas. [Protocolo del plan maestro, §13.5](../../CONTROL_TOWER_X_MASTER_PLAN.md#135-umbrales-iniciales-de-aceptación).
+### Capacidad en Forge staging 2.0.0 del 26 de noviembre de 2026
+
+La instalación de staging de PED vinculó en lectura los 120 ítems existentes. Se admitieron 30 corridas de S0 con 4.000 muestras, la semilla del oráculo local y hasta dos workers activos. Los registros de Forge confirmaron 30 publicaciones y 40 lotes guardados por corrida. Los tiempos se cruzaron por ID de corrida y se calcularon por rango más próximo.
+
+| Medición | n | p50 | p95 | Máximo |
+| --- | ---: | ---: | ---: | ---: |
+| Admisión en el resolver | 30 | 1,25 s | 1,84 s | 2,27 s |
+| Desde admisión hasta publicación, tanda cálida posterior | 20 | 10,38 s | 10,92 s | 10,95 s |
+| Desde admisión hasta publicación, total de corridas cálidas | 25 | 10,66 s | 32,73 s | 34,65 s |
+| Desde admisión hasta publicación, primer uso del worker | 5 | 13,66 s | 13,90 s | 13,90 s |
+| Cálculo y agregado dentro del worker | 30 | 5,45 s | 6,07 s | 6,37 s |
+| Persistencia y coordinación dentro del worker | 30 | 4,71 s | 5,45 s | 5,62 s |
+| Espera estimada desde la respuesta hasta el ingreso al worker | 30 | 0,38 s | 22,52 s | 23,50 s |
+
+La primera tanda tuvo dos esperas de cola mayores a 22 s. La medición desde el clic hasta observar la URL con el ID dio p95 de 3,84 s e incluye navegación y observación de la interfaz. La medición directa del bridge se realizó en la segunda serie. [Futuros en Forge staging](https://one-atlas-wjzw.atlassian.net/jira/software/projects/PED/apps/262d9dea-7d8b-4b70-ab88-f868960c2e09/1917a6a1-3453-4085-a00e-e7998f91d7c5) · [Protocolo del plan maestro, §13.5](../../CONTROL_TOWER_X_MASTER_PLAN.md#135-umbrales-iniciales-de-aceptación).
+
+### Admisión exacta y recuperación en Forge staging 2.1.0
+
+La segunda serie midió `performance.now()` alrededor de `invoke` en Custom UI, desde el envío hasta recibir el ID persistido. El rango más próximo sobre 30 admisiones de S0 con 4.000 muestras dio p50 de **1,508 s**, p95 de **1,675 s** y máximo de **1,926 s**. El mínimo fue 1,318 s. Las dos corridas de recuperación se ejecutaron aparte de las series de admisión y rendimiento.
+
+| Falla inducida | Estado observado en Jira | Resultado |
+| --- | --- | --- |
+| Se omitió el primer envío a la cola de S1 tras persistir y reservar el despacho | En cola con 0 muestras | El recuperador publicó las 4.000 muestras en el mismo ID `cb7342f7-1f22-49e0-a726-9f989c1b94bb`. Coincidió el hash de S1 registrado en development. |
+| Se detuvo el worker de S2 tras guardar su primer lote y con la concesión vigente | En ejecución con 100 de 4.000 muestras | Tras el vencimiento, el recuperador publicó las 4.000 muestras en el mismo ID `15fcf1c1-a712-4428-81c2-e5a04c9397e6`. Coincidió el hash de S2 registrado en development. |
+
+Las pruebas locales cubren entregas duplicadas, reordenamiento y pérdida intermedia durante la persistencia y el agregado. Las dos interrupciones de staging usaron una variante temporal del código limitada a corridas sintéticas de PED. Forge staging 2.2.0 retira esas fallas inducidas y conserva la medición de tiempos habilitada para el ensayo. [S1 recuperada](https://one-atlas-wjzw.atlassian.net/jira/software/projects/PED/apps/262d9dea-7d8b-4b70-ab88-f868960c2e09/1917a6a1-3453-4085-a00e-e7998f91d7c5/futuros/cb7342f7-1f22-49e0-a726-9f989c1b94bb) · [S2 recuperada](https://one-atlas-wjzw.atlassian.net/jira/software/projects/PED/apps/262d9dea-7d8b-4b70-ab88-f868960c2e09/1917a6a1-3453-4085-a00e-e7998f91d7c5/futuros/15fcf1c1-a712-4428-81c2-e5a04c9397e6).

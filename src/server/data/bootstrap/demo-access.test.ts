@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isConfiguredDemoProject, readDemoActor } from './demo-access';
+import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
 
 test('demo resolves the trusted Atlassian actor, including lowercase s, p and c', () => {
   assert.equal(readDemoActor({ accountId: '557058:site-person-c' }), '557058:site-person-c');
@@ -25,5 +25,26 @@ test('demo only enables the configured development Jira site and project', () =>
     ...runtime, installation: {
       contexts: [{ toString: () => 'ari:cloud:confluence::site/demo-cloud', cloudId: 'demo-cloud' }],
     },
+  }, '10202', config), false);
+});
+
+test('staging adoption requires the explicit flag and exact Jira installation and project', () => {
+  const config = { cloudId: 'demo-cloud', jiraProjectId: '10202', enabled: 'true' };
+  const runtime = {
+    environmentType: 'STAGING',
+    installation: { contexts: [{ toString: () => 'ari:cloud:jira::site/demo-cloud', cloudId: 'demo-cloud' }] },
+  };
+  assert.equal(isConfiguredStagingAdoption(runtime, '10202', config), true);
+  assert.equal(isConfiguredDemoProject(runtime, '10202', config), false);
+  assert.equal(isConfiguredStagingAdoption(runtime, '10202', { ...config, enabled: 'TRUE' }), false);
+  assert.equal(isConfiguredStagingAdoption(runtime, '10202', { ...config, enabled: undefined }), false);
+  assert.equal(isConfiguredStagingAdoption(runtime, '10203', config), false);
+  assert.equal(isConfiguredStagingAdoption(runtime, '10202', { ...config, cloudId: 'other-cloud' }), false);
+  for (const environmentType of ['PRODUCTION', 'DEVELOPMENT']) {
+    assert.equal(isConfiguredStagingAdoption({ ...runtime, environmentType }, '10202', config), false);
+  }
+  assert.equal(isConfiguredStagingAdoption({ environmentType: 'STAGING' }, '10202', config), false);
+  assert.equal(isConfiguredStagingAdoption({
+    ...runtime, installation: { contexts: [{ toString: () => 'ari:cloud:confluence::site/demo-cloud', cloudId: 'demo-cloud' }] },
   }, '10202', config), false);
 });

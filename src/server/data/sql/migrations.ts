@@ -4,7 +4,7 @@ import { fixtureMigrations } from '../bootstrap/schema';
 import { executeSql, getSqlApiError } from './client';
 import { modelMigrations, type SqlMigration } from './schema';
 
-const schemaVersion = 1;
+const schemaVersion = 2;
 const retryWindowMs = 60_000;
 const readinessMigration: SqlMigration = [
   'v001_99_create_ctx_schema_version',
@@ -13,7 +13,12 @@ const readinessMigration: SqlMigration = [
   )`,
 ];
 
-for (const [name, statement] of [...modelMigrations, ...fixtureMigrations, readinessMigration]) {
+const editorMigration: SqlMigration = [
+  'v002_01_add_scenario_editor_definition',
+  'ALTER TABLE ctx_scenario ADD COLUMN IF NOT EXISTS editor_definition_jcs TEXT',
+];
+
+for (const [name, statement] of [...modelMigrations, ...fixtureMigrations, readinessMigration, editorMigration]) {
   migrationRunner.enqueue(name, statement);
 }
 

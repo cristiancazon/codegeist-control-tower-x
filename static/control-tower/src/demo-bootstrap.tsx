@@ -93,6 +93,7 @@ export function DemoBootstrap() {
   }
 
   const completed = progress?.state === 'COMPLETE';
+  const adopting = progress?.mode === 'ADOPT_EXISTING';
   const canApply = progress && !completed && confirmed && !busy && retryAt === undefined;
   return (
     <section className="connection demo-bootstrap" aria-labelledby="demo-heading">
@@ -102,6 +103,7 @@ export function DemoBootstrap() {
           <>
             <p><strong>{progress.fixtureName}</strong> · {progress.jiraProjectKey}</p>
             <p>Datos ficticios. {progress.phases} fases, {progress.assets} activos, {progress.contractors} contratistas y {progress.historicalPeriods} meses de historia.</p>
+            {adopting && <p>Staging vincula los ítems de Jira existentes y guarda el modelo en su propio almacenamiento de Forge.</p>}
             <p id="demo-progress">{labels[progress.state]} · {progress.issuesMapped} de {progress.issuesTotal} ítems vinculados</p>
             <progress aria-labelledby="demo-progress" value={progress.issuesMapped} max={progress.issuesTotal} />
             {progress.firstIssueKey && <p>Envío A-17 · <code>{progress.firstIssueKey}</code></p>}
@@ -117,7 +119,9 @@ export function DemoBootstrap() {
             type="checkbox" checked={confirmed} disabled={!!busy}
             onChange={(event) => setConfirmed(event.target.checked)}
           />
-          Autorizo la carga de {progress.issuesTotal} ítems sintéticos en {progress.jiraProjectKey}.
+          {adopting
+            ? `Autorizo vincular en staging los ${progress.issuesTotal} ítems sintéticos existentes de ${progress.jiraProjectKey}.`
+            : `Autorizo la carga de ${progress.issuesTotal} ítems sintéticos en ${progress.jiraProjectKey}.`}
         </label>
       )}
       <div className="demo-actions">
@@ -126,7 +130,9 @@ export function DemoBootstrap() {
         </button>
         {progress && !completed && (
           <button type="button" disabled={!canApply} onClick={() => void apply()}>
-            {progress.state === 'NOT_STARTED' ? 'Cargar datos' : 'Reanudar carga'}
+            {adopting
+              ? (progress.state === 'NOT_STARTED' ? 'Vincular ítems existentes' : 'Reanudar vínculo')
+              : (progress.state === 'NOT_STARTED' ? 'Cargar datos' : 'Reanudar carga')}
           </button>
         )}
         {busy === 'apply' && <button type="button" onClick={() => { stopped.current = true; }}>Pausar</button>}

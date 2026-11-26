@@ -4,25 +4,28 @@ import { canonicalJson, inputDigest, sha256 } from '../../domain/futuros/digest'
 import { EngineValidationError, prepareEngine } from '../../domain/futuros/engine';
 import { compareSamples, StatisticsError, type StatisticsSummary } from '../../domain/futuros/statistics';
 import {
-  FUTUROS_CANCEL, FUTUROS_COMPARE, FUTUROS_GRANT, FUTUROS_RETRY, FUTUROS_RUN, FUTUROS_SCENARIOS, FUTUROS_START,
+  FUTUROS_CANCEL, FUTUROS_COMPARE, FUTUROS_CREATE_SCENARIO, FUTUROS_GRANT, FUTUROS_RETRY, FUTUROS_RUN, FUTUROS_SCENARIOS, FUTUROS_START,
   type FuturosCatalog, type FuturosComparison, type FuturosFailure, type FuturosResponse, type FuturosRun,
-  type FuturosRunCard,
+  type FuturosRunCard, type FuturosScenario,
 } from '../../shared/futuros';
-import { isConfiguredDemoProject, readDemoActor } from '../data/bootstrap/demo-access';
+import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from '../data/bootstrap/demo-access';
 import { fixture } from '../data/bootstrap/fixture';
 import { createForgeJiraProjectAdapter, JiraBoundaryError } from '../data/jira';
-import { executeSql } from '../data/sql/client';
+import { enqueue } from '../data/migration-events';
+import { executeSql, getSqlApiError } from '../data/sql/client';
+import { isSchemaReady } from '../data/sql/migrations';
 import { getProjectAccess } from '../data/sql/projects';
 import { readVisibleJiraIssues } from '../overview/resolvers';
 import type { RunRecord } from './run-store';
-import { futurosRunStore, futurosWorker, loadFuturosRunInput } from './runtime';
+import { futurosRunStore, futurosWorker, isStagingFuturosBenchmark, loadFuturosRunInput } from './runtime';
+import { parseScenarioEdit, publishScenarioRevision, ScenarioEditFailure } from './scenario-editor';
 import { readRunSamples, type FuturosResultManifest } from './worker';
 import { confirmFuturosVisibility, listFuturosScenarios, loadFuturosSnapshot, SnapshotFailure } from './snapshot';
 
 type Request = { payload?: unknown; context?: unknown };
 type Operation =
   | typeof FUTUROS_SCENARIOS | typeof FUTUROS_START | typeof FUTUROS_RUN | typeof FUTUROS_CANCEL
-  | typeof FUTUROS_COMPARE | typeof FUTUROS_GRANT | typeof FUTUROS_RETRY;
+  | typeof FUTUROS_COMPARE | typeof FUTUROS_GRANT | typeof FUTUROS_RETRY | typeof FUTUROS_CREATE_SCENARIO;
 const idPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const seedPattern = /^[0-9a-f]{32}$/;
 const messages: Record<FuturosFailure, string> = {
@@ -38,6 +41,8 @@ const messages: Record<FuturosFailure, string> = {
   MODEL_UNAVAILABLE: 'La versión del motor para esta entrada no está disponible.',
   INCOMPATIBLE_RUNS: 'Las corridas requieren el mismo snapshot, motor, objetivos, semilla y cantidad de muestras.',
   SAMPLES_EXPIRED: 'Venció el período de conservación de las muestras emparejadas.',
+  RATE_LIMITED: 'El servicio alcanzó el límite temporal de solicitudes. Volvé a intentar más tarde.',
+  NOT_FOUND: 'La referencia solicitada no está disponible.',
   UNAVAILABLE: 'Futuros no pudo responder. Volvé a intentar.',
 };
 
@@ -60,9 +65,11 @@ function id(value: unknown): string {
 }
 
 function isDemoConfiguration(projectId: string, jiraProjectId: string) {
-  return projectId === fixture.project.id && isConfiguredDemoProject(getAppContext(), jiraProjectId, {
-    cloudId: process.env.CTX_DEMO_CLOUD_ID, jiraProjectId: process.env.CTX_DEMO_JIRA_PROJECT_ID,
-  });
+  if (projectId !== fixture.project.id) return false;
+  const runtime = getAppContext();
+  const config = { cloudId: process.env.CTX_DEMO_CLOUD_ID, jiraProjectId: process.env.CTX_DEMO_JIRA_PROJECT_ID };
+  return isConfiguredDemoProject(runtime, jiraProjectId, config) ||
+    isConfiguredStagingAdoption(runtime, jiraProjectId, { ...config, enabled: process.env.CTX_STAGING_ADOPT_FIXTURE });
 }
 
 async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 'configure') {
@@ -80,21 +87,35 @@ async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 
       (mode === 'configure' && !mayConfigure) || (mode === 'catalog' && !mayRead && !mayConfigure)) {
     throw new FuturosError('FORBIDDEN');
   }
-  const active = await readVisibleJiraIssues(jira);
-  if (active.state !== 'READY' || !active.issues) throw new FuturosError('UNAVAILABLE');
-  if (!await confirmFuturosVisibility(access.projectId, jira.projectId, active.issues)) throw new FuturosError('FORBIDDEN');
+  let rateLimit: JiraBoundaryError | undefined;
+  const active = readVisibleJiraIssues({ ...jira, searchWorkItems: async (filter) => {
+    try {
+      return await jira.searchWorkItems(filter);
+    } catch (error) {
+      if (error instanceof JiraBoundaryError && error.code === 'RATE_LIMITED') rateLimit = error;
+      throw error;
+    }
+  } }).then((coverage) => {
+    if (rateLimit) throw rateLimit;
+    if (coverage.state !== 'READY' || !coverage.issues) throw new FuturosError('UNAVAILABLE');
+    return coverage.issues;
+  });
+  if (!await confirmFuturosVisibility(access.projectId, jira.projectId, active)) throw new FuturosError('FORBIDDEN');
   return { actor, jiraProjectId: jira.projectId, projectId: access.projectId, canStart, mayRead, mayConfigure };
 }
 
 async function protect<T>(operation: Operation, apply: () => Promise<T>): Promise<FuturosResponse<T>> {
   const requestId = randomUUID();
   const start = performance.now();
-  const audit = (code: string) => console.info(JSON.stringify({
+  const audit = (code: string, runId?: string) => console.info(JSON.stringify({
     requestId, operation, code, durationMs: Math.round(performance.now() - start),
+    ...(runId ? { runId } : {}),
   }));
   try {
     const data = await apply();
-    audit('READY');
+    const runId = (operation === FUTUROS_START || operation === FUTUROS_RETRY) && isStagingFuturosBenchmark() &&
+      data && typeof data === 'object' && 'id' in data && typeof data.id === 'string' && idPattern.test(data.id) ? data.id : undefined;
+    audit('READY', runId);
     return { ok: true, data, requestId };
   } catch (error) {
     if (error instanceof NeedsAuthenticationError) {
@@ -102,17 +123,25 @@ async function protect<T>(operation: Operation, apply: () => Promise<T>): Promis
       throw error;
     }
     let code: FuturosFailure = 'UNAVAILABLE';
-    if (error instanceof SnapshotFailure || error instanceof EngineValidationError || error instanceof FuturosError) {
+    let retryAfterSeconds: number | undefined;
+    if (error instanceof SnapshotFailure || error instanceof EngineValidationError || error instanceof FuturosError ||
+        error instanceof ScenarioEditFailure) {
       code = error.code;
-    } else if (error instanceof JiraBoundaryError && (error.code === 'FORBIDDEN' || error.code === 'AUTH_REQUIRED')) {
+    } else if (error instanceof JiraBoundaryError &&
+        (error.code === 'FORBIDDEN' || error.code === 'AUTH_REQUIRED' || error.code === 'RATE_LIMITED')) {
       code = error.code;
+      if (code === 'RATE_LIMITED') retryAfterSeconds = error.retryAfterSeconds;
+    } else if (getSqlApiError(error)?.responseDetails.status === 429) {
+      code = 'RATE_LIMITED';
     } else if (error instanceof StatisticsError && error.code === 'INCOMPATIBLE_RUNS') {
       code = 'INCOMPATIBLE_RUNS';
     } else if (error instanceof Error && 'code' in error && error.code === 'CONFLICT') {
       code = 'CONFLICT';
     }
     audit(code);
-    return { ok: false, error: { code, message: messages[code] }, requestId };
+    const message = operation === FUTUROS_CREATE_SCENARIO && code === 'STALE_INPUT'
+      ? 'El escenario cambió o venció el snapshot. Actualizá el catálogo antes de editar.' : messages[code];
+    return { ok: false, error: { code, message, ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }) }, requestId };
   }
 }
 
@@ -151,7 +180,7 @@ function runView(run: RunRecord, mayManage = false): FuturosRun {
 
 async function getVisibleRun(projectId: string, runId: string) {
   const run = await futurosRunStore.getRun(projectId, runId);
-  if (!run) throw new FuturosError('FORBIDDEN');
+  if (!run) throw new FuturosError('NOT_FOUND');
   const snapshots = await executeSql<{ id: string }>(
     `SELECT id FROM ctx_data_snapshot WHERE id = ? AND project_id = ? AND state = 'SEALED'
       AND access_class = 'SYNTHETIC_DEMO' AND expires_at > UTC_TIMESTAMP(3)`,
@@ -171,11 +200,22 @@ async function dispatchIfQueued(run: RunRecord) {
   }
 }
 
+async function ensureEditorSchema() {
+  if (await isSchemaReady()) return true;
+  try {
+    await enqueue();
+  } catch {
+    console.warn(JSON.stringify({ operation: 'futuros.editorSchema', code: 'PENDING_RECOVERY' }));
+  }
+  return false;
+}
+
 export const listScenarios = (request: Request) => protect<FuturosCatalog>(FUTUROS_SCENARIOS, async () => {
   parse(request.payload, []);
-  const { projectId, canStart, mayRead, mayConfigure } = await authorize(request.context, 'catalog');
-  if (!mayRead) return { scenarios: [], runs: [], canStart, canConfigureDemoPlanner: mayConfigure };
-  const scenarios = await listFuturosScenarios(projectId);
+  const { projectId, jiraProjectId, canStart, mayRead, mayConfigure } = await authorize(request.context, 'catalog');
+  if (!mayRead) return { scenarios: [], runs: [], canStart, canConfigureDemoPlanner: mayConfigure, jiraProjectId };
+  const editorReady = await ensureEditorSchema();
+  const scenarios = await listFuturosScenarios(projectId, executeSql, editorReady);
   const history = await executeSql<{
     id: string; scenario_id: string; status: FuturosRunCard['status']; sample_count: number; seed_hex: string; created_at: string;
   }>(`SELECT r.id, r.scenario_id, r.status, r.sample_count, r.seed_hex, CAST(r.created_at AS CHAR) AS created_at
@@ -183,10 +223,22 @@ export const listScenarios = (request: Request) => protect<FuturosCatalog>(FUTUR
       WHERE r.project_id = ? AND s.state = 'SEALED' AND s.access_class = 'SYNTHETIC_DEMO' AND s.expires_at > UTC_TIMESTAMP(3)
       ORDER BY r.created_at DESC, r.id LIMIT 15`, [projectId]);
   return {
-    scenarios, canStart, canConfigureDemoPlanner: mayConfigure && !canStart,
+    scenarios, canStart, canConfigureDemoPlanner: mayConfigure && !canStart, jiraProjectId,
+    ...(canStart && isStagingFuturosBenchmark() && isDemoConfiguration(projectId, jiraProjectId)
+      ? { stagingTiming: true } : {}),
     runs: history.map((row) => runCard({ id: row.id, scenarioId: row.scenario_id, status: row.status,
       sampleCount: row.sample_count, seed: row.seed_hex, createdAt: row.created_at.replace(' ', 'T') + 'Z' })),
   };
+});
+
+export const createScenario = (request: Request) => protect<FuturosScenario>(FUTUROS_CREATE_SCENARIO, async () => {
+  const edit = parseScenarioEdit(parse(request.payload, ['sourceScenarioId', 'expectedRevision', 'name', 'delayDays', 'idempotencyKey']));
+  const { projectId, actor } = await authorize(request.context, 'start');
+  if (!await ensureEditorSchema()) throw new FuturosError('UNAVAILABLE');
+  return publishScenarioRevision(projectId, actor, edit, async (delayDays) => {
+    const input = await loadFuturosSnapshot({ projectId, scenarioId: edit.sourceScenarioId, seed: '0'.repeat(32), sampleCount: 1000 });
+    prepareEngine({ ...input, gates: input.gates.map((gate) => ({ ...gate, delayDays })) });
+  });
 });
 
 export const startRun = (request: Request) => protect<FuturosRun>(FUTUROS_START, async () => {

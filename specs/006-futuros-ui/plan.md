@@ -8,19 +8,19 @@ SDD-005. Consumir errores, valores de estado y resultados documentados en los co
 
 ### R006-01 · Editor versionado
 
-El formulario usa schema compartido. Servidor valida permiso, revisión y unidades, y conserva una versión inmutable para la corrida.
+El formulario parte de S0 o de la última revisión editable de su propia familia. El perfil inicial permite editar el atraso de suministro de A-17 en días corridos, de 0 a 365. Forge fija el proyecto, la referencia de suministro, el snapshot y la procedencia. La publicación valida `PLANNER`, el último número de revisión y la clave idempotente. Las revisiones publicadas y sus corridas conservan la entrada original.
 
 ### R006-02 · Estado de corrida
 
-Hacer el polling con intervalo y backoff del contrato de §5. Aplicar control de doble clic, filtro por actor/proyecto y saneamiento de errores.
+Consultar el progreso cada cinco segundos mientras la página está visible. Ante errores transitorios, esperar hasta treinta segundos entre consultas, con variación aleatoria y respeto de `Retry-After`. Al iniciar o abrir una corrida, su ID queda en la ruta de la página Jira. Tras recargar, el servidor vuelve a validar el acceso. [Navegación de Custom UI](https://developer.atlassian.com/platform/forge/apis-reference/ui-api-bridge/view/#createhistory).
 
 ### R006-03 · Resultados y comparación
 
-Construir tabla accesible y gráfico coherente con la salida agregada. Para comparación emparejada, exigir la compatibilidad de §5.
+Mostrar cuantiles, intervalos, probabilidad de cumplimiento, censura e histogramas con una tabla de recuentos accesible. El comparador vuelve a leer cada resultado y aplica las reglas de compatibilidad del motor. Si cambiaron la semilla o la cantidad de muestras, muestra las métricas individuales y explica la ausencia de deltas emparejados.
 
 ### R006-04 · Handoff a Agent X
 
-Mostrar referencias a proyecto y corrida con procedimiento compatible con la superficie oficial. Aplicar fallback de abrir Rovo y proporcionar prompt si el puente no está habilitado en ese módulo.
+La consulta copiable incluye los identificadores de proyecto Jira y corrida. La apertura directa verifica la disponibilidad de Rovo en el sitio y usa el agente de la misma app. La acción de lectura conserva la identidad de Forge y revalida el rol y la visibilidad Jira antes de devolver agregados y referencias. [Bridge de Rovo](https://developer.atlassian.com/platform/forge/apis-reference/ui-api-bridge/rovo/) · [Acciones Forge](https://developer.atlassian.com/platform/forge/manifest-reference/modules/rovo-action/).
 
 ## Evidencia por entorno
 

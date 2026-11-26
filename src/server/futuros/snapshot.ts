@@ -1,10 +1,12 @@
 import { canonicalJson, sha256 } from '../../domain/futuros/digest';
 import type { EngineInput, Resource, SupplyGate, Task } from '../../domain/futuros/types';
 import type { PatagoniaFixture } from '../../domain/fixtures/patagonia';
+import type { FuturosScenario } from '../../shared/futuros';
 import { fixture } from '../data/bootstrap/fixture';
 import { isDateOnly, isRecord } from '../data/jira/normalize';
 import type { JiraWorkItem } from '../data/jira/types';
 import { executeSql } from '../data/sql/client';
+import { baselineEditor, listScenarioRevisions, loadScenarioRevision, ScenarioEditFailure } from './scenario-editor';
 
 export const futurosScenarioCodes = ['S0', 'S1', 'S2', 'S3', 'S4'] as const;
 type ScenarioCode = typeof futurosScenarioCodes[number];
@@ -35,6 +37,7 @@ type SnapshotRow = {
   snapshot_id: string; snapshot_hash: string; schema_version: number; scenario_version: number; chunk_count: number;
   as_of: string; scenario_hash: string; revision: number;
 };
+type ScenarioInput = Pick<PatagoniaFixture['scenarios'][number], 'id' | 'variables'>;
 type Chunk = { chunk_index: number; chunk_hash: string; payload_jcs: string };
 type Variable = {
   ordinal: number; variable_code: string; target_kind: string; target_id: string;
@@ -104,7 +107,7 @@ function addCrewOverride(resource: Resource, value: { capacity: number; fromDay:
 }
 
 function buildInput(
-  row: SnapshotRow, scenario: PatagoniaFixture['scenarios'][number], sections: SnapshotSections, seed: string, sampleCount: number,
+  row: SnapshotRow, scenario: ScenarioInput, sections: SnapshotSections, seed: string, sampleCount: number,
 ): EngineInput {
   const [project] = sections.project;
   const asOf = row.as_of;
@@ -191,8 +194,14 @@ function buildInput(
 export async function loadFuturosSnapshot(profile: {
   projectId: string; scenarioId: string; seed: string; sampleCount: number; snapshotId?: string;
 }, query: typeof executeSql = executeSql): Promise<EngineInput> {
-  const scenario = seededScenario.get(profile.scenarioId);
-  if (profile.projectId !== fixture.project.id || !scenario) throw new SnapshotFailure('FORBIDDEN');
+  if (profile.projectId !== fixture.project.id) throw new SnapshotFailure('FORBIDDEN');
+  const seeded = seededScenario.get(profile.scenarioId);
+  const revision = seeded ? null : await loadScenarioRevision(profile.projectId, profile.scenarioId, query).catch((error: unknown) => {
+    if (error instanceof ScenarioEditFailure && (error.code === 'FORBIDDEN' || error.code === 'STALE_INPUT')) {
+      throw new SnapshotFailure(error.code);
+    }
+    throw error;
+  });
   const rows = await query<SnapshotRow>(
     `SELECT s.id AS snapshot_id, s.content_hash AS snapshot_hash, s.schema_version, s.chunk_count,
             CAST(s.as_of_date AS CHAR) AS as_of, c.schema_version AS scenario_version, c.content_hash AS scenario_hash, c.revision
@@ -201,35 +210,46 @@ export async function loadFuturosSnapshot(profile: {
      INNER JOIN ctx_data_snapshot s ON s.id = c.snapshot_id AND s.project_id = c.project_id
      WHERE c.project_id = ? AND c.id = ? AND s.id = ? AND c.state = 'PUBLISHED'
        AND s.state = 'SEALED' AND s.access_class = 'SYNTHETIC_DEMO' AND s.expires_at > UTC_TIMESTAMP(3)`,
-    [profile.projectId, profile.scenarioId, profile.snapshotId ?? scenario.snapshotId],
+    [profile.projectId, profile.scenarioId, profile.snapshotId ?? fixture.snapshot.id],
   );
   const row = rows[0];
   if (!row || row.snapshot_id !== fixture.snapshot.id || !isDateOnly(row.as_of) || row.as_of !== fixture.snapshot.asOfDate) {
     throw new SnapshotFailure('STALE_INPUT');
   }
-  const [chunks, variables] = await Promise.all([
-    query<Chunk>(`SELECT k.chunk_index, k.chunk_hash, k.payload_jcs FROM ctx_snapshot_chunk k
+  const chunksPromise = query<Chunk>(`SELECT k.chunk_index, k.chunk_hash, k.payload_jcs FROM ctx_snapshot_chunk k
       INNER JOIN ctx_data_snapshot s ON s.id = k.snapshot_id
-      WHERE k.snapshot_id = ? AND s.project_id = ? ORDER BY k.chunk_index LIMIT 161`, [row.snapshot_id, profile.projectId]),
-    query<Variable>(`SELECT v.ordinal, v.variable_code, v.target_kind, v.target_id, v.unit_code, v.value_jcs,
+      WHERE k.snapshot_id = ? AND s.project_id = ? ORDER BY k.chunk_index LIMIT 161`, [row.snapshot_id, profile.projectId]);
+  const [chunks, variables] = await Promise.all([
+    chunksPromise,
+    seeded ? query<Variable>(`SELECT v.ordinal, v.variable_code, v.target_kind, v.target_id, v.unit_code, v.value_jcs,
       v.evidence_jcs, v.reason FROM ctx_scenario_variable v INNER JOIN ctx_scenario c ON c.id = v.scenario_id
-      WHERE c.project_id = ? AND c.id = ? ORDER BY v.ordinal LIMIT 20`, [profile.projectId, scenario.id]),
+      WHERE c.project_id = ? AND c.id = ? ORDER BY v.ordinal LIMIT 20`, [profile.projectId, seeded.id]) : [],
   ]);
-  validateVariables(scenario, row, variables);
+  if (seeded) validateVariables(seeded, row, variables);
+  if (revision && (row.scenario_hash !== revision.scenario.scenarioHash || row.revision !== revision.scenario.revision ||
+    row.scenario_version !== row.schema_version)) throw new SnapshotFailure('STALE_INPUT');
+  const scenario = seeded ?? { id: profile.scenarioId, variables: revision ? [revision.variable] : [] };
   return buildInput(row, scenario, readSections(row, chunks), profile.seed, profile.sampleCount);
 }
 
-export async function confirmFuturosVisibility(projectId: string, jiraProjectId: string, jiraIssues: readonly JiraWorkItem[],
+export async function confirmFuturosVisibility(projectId: string, jiraProjectId: string,
+  pendingJiraIssues: readonly JiraWorkItem[] | Promise<readonly JiraWorkItem[]>,
   query: typeof executeSql = executeSql): Promise<boolean> {
-  if (projectId !== fixture.project.id || jiraIssues.length < fixture.workPackages.length) return false;
-  const visible = new Set(jiraIssues.filter((issue) => issue.projectId === jiraProjectId).map(({ id }) => id));
-  const rows = await query<{ id: string; jira_issue_id: string }>(
+  if (projectId !== fixture.project.id) return false;
+  const pendingMappings = query<{ id: string; jira_issue_id: string }>(
     `SELECT w.id, w.jira_issue_id FROM ctx_work_package w
      INNER JOIN ctx_source_mapping m ON m.project_id = w.project_id AND m.entity_id = w.id AND m.source_id = w.jira_issue_id
      WHERE w.project_id = ? AND w.tombstoned_at IS NULL AND m.source_system = 'JIRA' AND m.source_scope = ?
        AND m.entity_kind = 'WORK_PACKAGE' AND m.tombstoned_at IS NULL`,
     [projectId, jiraProjectId],
   );
+  const [visibility, mappings] = await Promise.allSettled([pendingJiraIssues, pendingMappings]);
+  if (visibility.status === 'rejected') throw visibility.reason;
+  const jiraIssues = visibility.value;
+  if (jiraIssues.length < fixture.workPackages.length) return false;
+  if (mappings.status === 'rejected') throw mappings.reason;
+  const rows = mappings.value;
+  const visible = new Set(jiraIssues.filter((issue) => issue.projectId === jiraProjectId).map(({ id }) => id));
   const work = new Map(rows.map(({ id, jira_issue_id }) => [id, jira_issue_id]));
   return fixture.workPackages.every(({ id }) => {
     const issueId = work.get(id);
@@ -237,20 +257,24 @@ export async function confirmFuturosVisibility(projectId: string, jiraProjectId:
   });
 }
 
-export async function listFuturosScenarios(projectId: string, query: typeof executeSql = executeSql) {
+export async function listFuturosScenarios(projectId: string, query: typeof executeSql = executeSql,
+  editorReady = true): Promise<FuturosScenario[]> {
   if (projectId !== fixture.project.id) return [];
   const rows = await query<{ id: string; name: string; revision: number; content_hash: string; snapshot_id: string; as_of: string }>(
     `SELECT c.id, c.name, c.revision, c.content_hash, c.snapshot_id, CAST(s.as_of_date AS CHAR) AS as_of
      FROM ctx_scenario c INNER JOIN ctx_data_snapshot s ON s.id = c.snapshot_id AND s.project_id = c.project_id
      WHERE c.project_id = ? AND s.id = ? AND c.state = 'PUBLISHED' AND s.state = 'SEALED'
-       AND s.access_class = 'SYNTHETIC_DEMO' AND s.expires_at > UTC_TIMESTAMP(3) ORDER BY c.id LIMIT 30`,
-    [projectId, fixture.snapshot.id],
+       AND s.access_class = 'SYNTHETIC_DEMO' AND s.expires_at > UTC_TIMESTAMP(3) AND c.id IN (?, ?, ?, ?, ?)`,
+    [projectId, fixture.snapshot.id, ...seededScenario.keys()],
   );
-  return rows.flatMap((row) => {
+  const authored = rows.flatMap((row): FuturosScenario[] => {
     const scenario = seededScenario.get(row.id);
-    if (!scenario || !isDateOnly(row.as_of) || row.content_hash !== expectedScenarioHash.get(row.id) ||
+    if (!scenario || row.as_of !== fixture.snapshot.asOfDate || row.content_hash !== expectedScenarioHash.get(row.id) ||
+        row.revision !== scenario.revision || row.name !== scenario.name ||
         !futurosScenarioCodes.includes(scenario.code as ScenarioCode)) return [];
     return [{ id: row.id, code: scenario.code as ScenarioCode, name: row.name, revision: row.revision,
-      snapshotId: row.snapshot_id, asOf: row.as_of }];
+      snapshotId: row.snapshot_id, asOf: row.as_of, scenarioHash: row.content_hash,
+      ...(editorReady && scenario.code === 'S0' ? { editor: baselineEditor() } : {}) }];
   }).sort((a, b) => a.code.localeCompare(b.code));
+  return editorReady ? [...authored, ...await listScenarioRevisions(projectId, query)] : authored;
 }

@@ -171,6 +171,9 @@ button:focus-visible {
 
 .futuros-settings input,
 .futuros-settings select {
+  min-inline-size: 0;
+  inline-size: 100%;
+  box-sizing: border-box;
   font: inherit;
   padding: 0.5rem;
   color: var(--ds-text);
@@ -193,12 +196,28 @@ button:focus-visible {
   border-radius: 0.5rem;
 }
 
-.futuros-result dd {
-  margin-inline-start: 0;
-  font-weight: 600;
+.futuros-runner > section + section {
+  margin-block-start: 2rem;
 }
 
-.futuros-digest {
-  overflow-wrap: anywhere;
-  font-size: 0.875rem;
+.futuros-editor,
+.futuros-detail {
+  margin-block-start: 1rem;
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  border: 1px solid var(--ds-border, #c1c7d0);
+  border-radius: 0.5rem;
+}
+
+.futuros-runs > li[data-focused='true'] {
+  border-color: var(--ds-border-focused, #0c66e4);
+}
+
+.futuros-run-state progress {
+  inline-size: 100%;
+  accent-color: var(--ds-background-brand-bold, #0c66e4);
+}
+
+.futuros-comparison-controls {
+  max-inline-size: none;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
 }

@@ -12,6 +12,7 @@ export type DemoProgress = {
   contractors: number;
   historicalPeriods: number;
   state: 'NOT_STARTED' | 'IMPORTING' | 'PUBLISHING' | 'COMPLETE' | 'REVIEW';
+  mode?: 'ADOPT_EXISTING';
   firstIssueKey?: string;
 };
 

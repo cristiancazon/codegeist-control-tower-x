@@ -7,7 +7,7 @@ import type { EngineInput } from '../../domain/futuros/types';
 import type { executeSql, SqlParameter } from '../data/sql/client';
 import { modelMigrations } from '../data/sql/schema';
 import { createRunStore, type NewRun } from './run-store';
-import { createFuturosWorker, readRunSamples, type FuturosResultManifest } from './worker';
+import { createFuturosWorker, readRunSamples, type FuturosResultManifest, type FuturosWorkerTiming } from './worker';
 
 const projectId = 'test-project';
 const syntheticInput: EngineInput = {
@@ -172,9 +172,18 @@ test('CT005-04 resumed processing publishes the same result hash and retained sa
   assert.equal(await store.releaseRun(abandoned), true);
 
   const finalWorker = createFuturosWorker({ store, loadInput, push });
-  await finalWorker.consume(resumed.id);
+  const timings: FuturosWorkerTiming[] = [];
+  await finalWorker.consume(resumed.id, (timing) => {
+    timings.push(timing);
+    throw new Error('telemetry unavailable');
+  });
   const complete = (await store.startRun(newRun('same-input'))).run;
-  await finalWorker.consume(complete.id);
+  await finalWorker.consume(complete.id, (timing) => { timings.push(timing); });
+  assert.deepEqual(timings.map(({ runId, processFirstInvocation, outcome, savedBatches }) =>
+    ({ runId, processFirstInvocation, outcome, savedBatches })), [
+    { runId: resumed.id, processFirstInvocation: true, outcome: 'PUBLISHED', savedBatches: 2 },
+    { runId: complete.id, processFirstInvocation: false, outcome: 'PUBLISHED', savedBatches: 3 },
+  ]);
   const resumedResult = await store.getRun(projectId, resumed.id);
   assert.ok(resumedResult?.resultManifestJcs);
   assert.equal(resumedResult.status, 'SUCCEEDED');

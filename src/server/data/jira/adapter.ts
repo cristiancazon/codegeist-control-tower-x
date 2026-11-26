@@ -51,6 +51,21 @@ function isDefinitePostRejection(status: number): boolean {
   return status === 400 || status === 401 || status === 403 || status === 404 || status === 422 || status === 429;
 }
 
+function readTaskTypeId(issueTypes: unknown[]): string {
+  const taskIds = new Set<string>();
+  for (const type of issueTypes) {
+    if (isRecord(type) && typeof type.name === 'string' && TASK_TYPE_NAMES.includes(type.name.trim().toLowerCase()) &&
+        type.subtask === false && isJiraId(type.id)) {
+      taskIds.add(type.id);
+    }
+  }
+  const [issueTypeId] = taskIds;
+  if (taskIds.size !== 1 || !issueTypeId) {
+    throw new JiraBoundaryError('CONFLICT', 'El proyecto Jira debe ofrecer un único tipo de trabajo Tarea (Task).');
+  }
+  return issueTypeId;
+}
+
 export function createJiraProjectAdapter(projectId: string, request: JiraRequest, budgetMs = DEFAULT_INVOCATION_BUDGET_MS) {
   if (!isJiraId(projectId) || !Number.isSafeInteger(budgetMs) || budgetMs < 1 || budgetMs > DEFAULT_INVOCATION_BUDGET_MS) {
     throw new JiraBoundaryError('VALIDATION_ERROR', 'El contexto o presupuesto Jira no es válido.');
@@ -166,13 +181,26 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
     browseConfirmed = true;
   }
 
-  async function getProject(): Promise<JiraProjectIdentity> {
-    await requireBrowsePermission();
-    const body = await requestJson(route`/rest/api/3/project/${projectId}`);
+  function readProject(body: unknown): JiraProjectIdentity {
     if (!isRecord(body) || body.id !== projectId || !isText(body.key, 40) || !isText(body.name, 255)) {
       throw new JiraBoundaryError('SOURCE_UNAVAILABLE', 'Jira no confirmó la identidad del proyecto actual.');
     }
     return { id: projectId, key: body.key, name: body.name };
+  }
+
+  async function getProject(): Promise<JiraProjectIdentity> {
+    await requireBrowsePermission();
+    return readProject(await requestJson(route`/rest/api/3/project/${projectId}`));
+  }
+
+  async function getProjectWithTaskType(): Promise<JiraProjectIdentity & { taskIssueTypeId: string }> {
+    await requireBrowsePermission();
+    const body = await requestJson(route`/rest/api/3/project/${projectId}?expand=issueTypes`);
+    const project = readProject(body);
+    if (!isRecord(body) || !Array.isArray(body.issueTypes) || body.issueTypes.length > 250) {
+      throw new JiraBoundaryError('SOURCE_UNAVAILABLE', 'Jira no confirmó los tipos de trabajo del proyecto.');
+    }
+    return { ...project, taskIssueTypeId: readTaskTypeId(body.issueTypes) };
   }
 
   async function readCreateMetadataPages(pagePath: (offset: number) => Route, property: 'issueTypes' | 'fields'): Promise<unknown[]> {
@@ -201,17 +229,7 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
     await requireBrowsePermission();
     const issueTypes = await readCreateMetadataPages((startAt) =>
       route`/rest/api/3/issue/createmeta/${projectId}/issuetypes?startAt=${startAt}&maxResults=${CREATE_METADATA_PAGE_SIZE}`, 'issueTypes');
-    const taskIds = new Set<string>();
-    for (const type of issueTypes) {
-      if (isRecord(type) && typeof type.name === 'string' && TASK_TYPE_NAMES.includes(type.name.trim().toLowerCase()) &&
-          type.subtask === false && isJiraId(type.id)) {
-        taskIds.add(type.id);
-      }
-    }
-    const [issueTypeId] = taskIds;
-    if (taskIds.size !== 1 || !issueTypeId) {
-      throw new JiraBoundaryError('CONFLICT', 'El proyecto Jira debe ofrecer un único tipo de trabajo Tarea (Task).');
-    }
+    const issueTypeId = readTaskTypeId(issueTypes);
 
     const fields = await readCreateMetadataPages((startAt) =>
       route`/rest/api/3/issue/createmeta/${projectId}/issuetypes/${issueTypeId}?startAt=${startAt}&maxResults=${CREATE_METADATA_PAGE_SIZE}`, 'fields');
@@ -246,7 +264,9 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
     };
   }
 
-  async function searchWorkItems({ marker, nextPageToken, pageSize = 50 }: JiraSearchOptions = {}): Promise<JiraWorkItemPage> {
+  async function searchWorkItems(
+    { marker, nextPageToken, pageSize = 50 }: JiraSearchOptions = {}, method: 'GET' | 'POST' = 'POST',
+  ): Promise<JiraWorkItemPage> {
     if ((marker !== undefined && !isFixtureMarker(marker)) || (nextPageToken !== undefined && !isText(nextPageToken, 4096)) ||
         !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
       throw new JiraBoundaryError('VALIDATION_ERROR', 'Los filtros de Jira no son válidos.');
@@ -254,9 +274,14 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
 
     await requireBrowsePermission();
     const jql = `project = ${projectId}${marker === undefined ? '' : ` AND labels = "${marker}"`} ORDER BY id ASC`;
-    const body = await requestJson(route`/rest/api/3/search/jql`, {
-      body: { jql, fields: ISSUE_FIELDS, maxResults: pageSize, ...(nextPageToken === undefined ? {} : { nextPageToken }) },
-    });
+    const continuation = nextPageToken === undefined ? {} : { nextPageToken };
+    const parameters = new URLSearchParams({ jql, fields: ISSUE_FIELDS.join(','), maxResults: String(pageSize) });
+    if (nextPageToken !== undefined) parameters.set('nextPageToken', nextPageToken);
+    const body = method === 'GET'
+      ? await requestJson(route`/rest/api/3/search/jql?${parameters}`)
+      : await requestJson(route`/rest/api/3/search/jql`, {
+        body: { jql, fields: ISSUE_FIELDS, maxResults: pageSize, ...continuation },
+      });
     if (!isRecord(body) || !Array.isArray(body.issues) || body.issues.length > pageSize ||
         (body.nextPageToken != null && (!isText(body.nextPageToken, 4096) || body.nextPageToken === nextPageToken)) ||
         (body.isLast === false && body.nextPageToken == null) || (body.isLast === true && body.nextPageToken != null)) {
@@ -332,7 +357,8 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
 
   return {
     projectId, checkPermissions, assertBrowsePermission: requireBrowsePermission, assertBootstrapPermissions,
-    getProject, getTaskCreateMetadata, searchWorkItems, getWorkItem, createFixtureTask,
+    getProject, getProjectWithTaskType, getTaskCreateMetadata, searchWorkItems,
+    searchWorkItemsGet: (options: JiraSearchOptions) => searchWorkItems(options, 'GET'), getWorkItem, createFixtureTask,
   };
 }
 

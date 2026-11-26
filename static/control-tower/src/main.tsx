@@ -7,6 +7,7 @@ import { OverviewDashboard } from './overview';
 import { OperationsDashboard } from './operations';
 import { FuturosRunner } from './futuros-runner';
 import type { OperationsTarget } from '../../../src/shared/operations';
+import { projectPath, projectRoute, type ProjectRoute } from '../../../src/shared/futuros-navigation';
 import './styles.css';
 
 const invoke = makeInvoke<{ [HEALTH_OPERATION]: () => HealthResponse | undefined }>();
@@ -98,29 +99,49 @@ function ForgeConnection() {
 
 function App() {
   const [hasOpenedTools, setHasOpenedTools] = useState(false);
-  const [viewName, setViewName] = useState<'overview' | 'operations' | 'futuros'>('overview');
+  const [route, setRoute] = useState<ProjectRoute>({ view: 'overview' });
   const [target, setTarget] = useState<OperationsTarget>();
+  const history = useRef<Awaited<ReturnType<typeof view.createHistory>>>(null);
   const operationsNavigation = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void view.createHistory().then((navigation) => {
+      if (!active) return;
+      history.current = navigation;
+      setRoute(projectRoute(navigation.location.pathname));
+      unlisten = navigation.listen(({ pathname }) => setRoute(projectRoute(pathname)));
+    }).catch(() => undefined);
+    return () => { active = false; unlisten?.(); history.current = null; };
+  }, []);
+
+  function navigate(next: ProjectRoute) {
+    setRoute(next);
+    const pathname = projectPath(next);
+    if (history.current?.location.pathname !== pathname) history.current?.push(pathname);
+  }
 
   function openOperations(next?: OperationsTarget) {
     setTarget(next);
-    setViewName('operations');
+    navigate({ view: 'operations' });
     operationsNavigation.current?.focus();
   }
 
   return (
     <main className="page">
       <nav className="app-navigation" aria-label="Vistas de Control Tower X">
-        <button type="button" aria-current={viewName === 'overview' ? 'page' : undefined}
-          onClick={() => setViewName('overview')}>Vista general</button>
-        <button type="button" ref={operationsNavigation} aria-current={viewName === 'operations' ? 'page' : undefined}
+        <button type="button" aria-current={route.view === 'overview' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'overview' })}>Vista general</button>
+        <button type="button" ref={operationsNavigation} aria-current={route.view === 'operations' ? 'page' : undefined}
           onClick={() => openOperations()}>Explorar proyecto</button>
-        <button type="button" aria-current={viewName === 'futuros' ? 'page' : undefined}
-          onClick={() => setViewName('futuros')}>Futuros</button>
+        <button type="button" aria-current={route.view === 'futuros' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'futuros' })}>Futuros</button>
       </nav>
-      {viewName === 'overview' && <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />}
-      {viewName === 'operations' && <OperationsDashboard initialTarget={target} />}
-      {viewName === 'futuros' && <FuturosRunner />}
+      {route.view === 'overview' && <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />}
+      {route.view === 'operations' && <OperationsDashboard initialTarget={target} />}
+      {route.view === 'futuros' && <FuturosRunner focusedRunId={route.runId}
+        onFocusRun={(runId) => navigate({ view: 'futuros', runId })} />}
       <details className="installation-tools" onToggle={(event) => {
         if (event.currentTarget.open) {
           setHasOpenedTools(true);

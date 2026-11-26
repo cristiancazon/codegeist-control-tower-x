@@ -4,11 +4,12 @@ import { validatePatagoniaFixture } from '../../../domain/fixtures/validate-pata
 import type { DemoProgress, DemoResponse } from '../../../shared/demo';
 import {
   createForgeJiraProjectAdapter, fixtureMarker, JiraBoundaryError,
-  type JiraProjectAdapter, type JiraTaskCreateMetadata,
+  type JiraIssueIdentity, type JiraProjectAdapter, type JiraTaskCreateMetadata,
 } from '../jira';
 import { enqueue as enqueueSchema } from '../migration-events';
 import { isSchemaReady } from '../sql/migrations';
-import { isConfiguredDemoProject, readDemoActor } from './demo-access';
+import { readExistingFixture } from './adoption';
+import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
 import { demoProjectKey, fixture, fixtureHash } from './fixture';
 import { enqueueFixturePublish } from './publish';
 import { advanceFixtureReconciliation } from './reconciliation';
@@ -39,14 +40,29 @@ async function authorize(context: unknown) {
     throw new DemoError('AUTH_REQUIRED', 'Iniciá sesión en Jira para preparar la demostración.');
   }
   const jira = createForgeJiraProjectAdapter(context);
-  if (!isConfiguredDemoProject(getAppContext(), jira.projectId, {
+  const runtime = getAppContext();
+  const config = {
     cloudId: process.env.CTX_DEMO_CLOUD_ID,
     jiraProjectId: process.env.CTX_DEMO_JIRA_PROJECT_ID,
-  })) {
+  };
+  const adopt = isConfiguredStagingAdoption(runtime, jira.projectId, {
+    ...config, enabled: process.env.CTX_STAGING_ADOPT_FIXTURE,
+  });
+  if (!adopt && !isConfiguredDemoProject(runtime, jira.projectId, config)) {
     throw new DemoError('FORBIDDEN', 'La carga solo está habilitada para PED en el sitio Jira de demostración.');
   }
-  await jira.assertBootstrapPermissions();
-  const project = await jira.getProject();
+  if (adopt) {
+    const permissions = await jira.checkPermissions(['BROWSE_PROJECTS', 'ADMINISTER_PROJECTS']);
+    if (permissions.BROWSE_PROJECTS !== true || permissions.ADMINISTER_PROJECTS !== true) {
+      throw new DemoError('FORBIDDEN', 'El vínculo de staging requiere administrar y leer el proyecto PED.');
+    }
+  } else {
+    await jira.assertBootstrapPermissions();
+  }
+  const access = adopt
+    ? { mode: 'ADOPT_EXISTING' as const, project: await jira.getProjectWithTaskType() }
+    : { mode: 'CREATE' as const, project: await jira.getProject() };
+  const { project } = access;
   if (project.key !== demoProjectKey) {
     throw new DemoError('FORBIDDEN', 'La carga está disponible únicamente en el espacio de prueba PED.');
   }
@@ -54,7 +70,7 @@ async function authorize(context: unknown) {
     await enqueueSchema();
     throw new DemoError('SCHEMA_PENDING', 'Forge está preparando las tablas. Volvé a consultar en unos minutos.');
   }
-  return { actor, jira, project };
+  return { actor, jira, ...access };
 }
 
 function checkImport(row: ImportRow | undefined, actor: string) {
@@ -63,7 +79,9 @@ function checkImport(row: ImportRow | undefined, actor: string) {
   }
 }
 
-function describe(row: ImportRow | undefined, tickets: TicketRow[], firstIssueKey?: string): DemoProgress {
+function describe(
+  row: ImportRow | undefined, tickets: TicketRow[], firstIssueKey?: string, mode?: 'ADOPT_EXISTING' | 'CREATE',
+): DemoProgress {
   const done = tickets.filter((ticket) => ticket.state === 'DONE');
   let state: DemoProgress['state'] = 'NOT_STARTED';
   if (row) {
@@ -82,6 +100,7 @@ function describe(row: ImportRow | undefined, tickets: TicketRow[], firstIssueKe
     phases: fixture.phases.length, assets: fixture.assets.length,
     contractors: fixture.contractors.length, historicalPeriods: 24,
     state, ...(firstIssueKey ? { firstIssueKey } : {}),
+    ...(mode === 'ADOPT_EXISTING' ? { mode } : {}),
   };
 }
 
@@ -166,22 +185,35 @@ async function mapTask(
   return true;
 }
 
+async function recordAdoptedTask(task: Task, issue: JiraIssueIdentity, current?: TicketRow) {
+  const reserved = current?.state === 'CREATING' || current?.state === 'REVIEW';
+  const attempt = reserved ? current.attempt_id : randomUUID();
+  if (!reserved && !await claimTicket(projectId, task.code, fixtureMarker(task.code), attempt)) return false;
+  await recordTicketIdentity(projectId, task.code, attempt, issue);
+  return true;
+}
+
 async function preview(request: Request): Promise<DemoProgress> {
   const { payload, context } = request;
   if (payload !== undefined && (!isRecord(payload) || Reflect.ownKeys(payload).length !== 0)) {
     throw new DemoError('VALIDATION_ERROR', 'La vista previa no admite parámetros.');
   }
-  const { actor, jira, project } = await authorize(context);
+  const access = await authorize(context);
+  const { actor, jira, project, mode } = access;
   const current = await readImport(projectId, project.id);
   checkImport(current, actor);
   if (current && current.state !== 'LOADING' && !await isProjectAdmin(projectId, actor)) {
     throw new DemoError('FORBIDDEN', 'La cuenta perdió el rol de administración de la aplicación.');
   }
-  await jira.getTaskCreateMetadata();
+  if (access.mode === 'ADOPT_EXISTING') {
+    if (current?.state !== 'COMPLETE') await readExistingFixture(jira, access.project.taskIssueTypeId);
+  } else {
+    await jira.getTaskCreateMetadata();
+  }
   // A full fixture is validated prior to offering confirmation of an import.
   validatePatagoniaFixture(fixture);
   const tickets = current ? await readTickets(projectId) : [];
-  return describe(current, tickets, await readVisibleAnchor(jira, tickets));
+  return describe(current, tickets, await readVisibleAnchor(jira, tickets), mode);
 }
 
 async function apply(request: Request): Promise<DemoProgress> {
@@ -189,8 +221,13 @@ async function apply(request: Request): Promise<DemoProgress> {
   if (!isRecord(payload) || Reflect.ownKeys(payload).length !== 1 || payload.fixtureHash !== fixtureHash) {
     throw new DemoError('VALIDATION_ERROR', 'Revisá y confirmá la vista previa vigente antes de cargar.');
   }
-  const { actor, jira, project } = await authorize(context);
+  const access = await authorize(context);
+  const { actor, jira, project, mode } = access;
   let current = await readImport(projectId, project.id);
+  checkImport(current, actor);
+  const adopted = access.mode === 'ADOPT_EXISTING' && current?.state !== 'COMPLETE'
+    ? await readExistingFixture(jira, access.project.taskIssueTypeId)
+    : undefined;
   if (!current || current.state === 'LOADING') {
     validatePatagoniaFixture(fixture);
     current = await reserveProject(fixture, project, actor, fixtureHash);
@@ -210,11 +247,21 @@ async function apply(request: Request): Promise<DemoProgress> {
   }
   const existing = await readTickets(projectId);
   if (current.state === 'COMPLETE') {
-    return describe(current, existing, await readVisibleAnchor(jira, existing));
+    return describe(current, existing, await readVisibleAnchor(jira, existing), mode);
   }
   const byCode = new Map(existing.map((ticket) => [ticket.task_code, ticket]));
   const remaining = fixture.workPackages.filter((task) => byCode.get(task.code)?.state !== 'DONE');
-  if (remaining.length) {
+  if (access.mode === 'ADOPT_EXISTING') {
+    if (!adopted || existing.some((ticket) => ticket.state === 'DONE' &&
+        (adopted.get(ticket.task_code)?.id !== ticket.issue_id || adopted.get(ticket.task_code)?.key !== ticket.issue_key))) {
+      throw new DemoError('RECONCILIATION_REQUIRED', 'Los vínculos de staging ya guardados no coinciden con Jira.');
+    }
+    for (const task of remaining.slice(0, batchSize)) {
+      const issue = adopted.get(task.code);
+      if (!issue) throw new DemoError('RECONCILIATION_REQUIRED', 'Falta un ítem sintético original de PED.');
+      if (!await recordAdoptedTask(task, issue, byCode.get(task.code))) break;
+    }
+  } else if (remaining.length) {
     const metadata = await jira.getTaskCreateMetadata();
     for (const task of remaining.slice(0, batchSize)) {
       if (!await mapTask(jira, actor, metadata, task, byCode.get(task.code))) {
@@ -222,7 +269,7 @@ async function apply(request: Request): Promise<DemoProgress> {
       }
     }
   }
-  const result = describe(current, await readTickets(projectId));
+  const result = describe(current, await readTickets(projectId), undefined, mode);
   if (result.state === 'PUBLISHING') {
     await enqueueFixturePublish(project.id);
   }

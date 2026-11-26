@@ -8,8 +8,11 @@ import { overviewResolvers } from './server/overview/resolvers';
 import { OVERVIEW_ALERT, OVERVIEW_GET } from './shared/overview';
 import { operationsResolvers } from './server/operations/resolvers';
 import { OPERATIONS_DETAIL, OPERATIONS_LIST } from './shared/operations';
-import { cancelRun, compareRuns, getRun, grantDemoPlanner, listScenarios, retryRun, startRun } from './server/futuros/resolvers';
-import { FUTUROS_CANCEL, FUTUROS_COMPARE, FUTUROS_GRANT, FUTUROS_RETRY, FUTUROS_RUN, FUTUROS_SCENARIOS, FUTUROS_START } from './shared/futuros';
+import { cancelRun, compareRuns, createScenario, getRun, grantDemoPlanner, listScenarios, retryRun, startRun } from './server/futuros/resolvers';
+import {
+  FUTUROS_CANCEL, FUTUROS_COMPARE, FUTUROS_CREATE_SCENARIO, FUTUROS_GRANT, FUTUROS_RETRY, FUTUROS_RUN,
+  FUTUROS_SCENARIOS, FUTUROS_START,
+} from './shared/futuros';
 
 const resolveHealth = createHealthResolver({
   requestBrowsePermission: (projectId) =>
@@ -29,6 +32,7 @@ resolver.define(OVERVIEW_ALERT, overviewResolvers.alert);
 resolver.define(OPERATIONS_LIST, operationsResolvers.list);
 resolver.define(OPERATIONS_DETAIL, operationsResolvers.detail);
 resolver.define(FUTUROS_SCENARIOS, listScenarios);
+resolver.define(FUTUROS_CREATE_SCENARIO, createScenario);
 resolver.define(FUTUROS_START, startRun);
 resolver.define(FUTUROS_RETRY, retryRun);
 resolver.define(FUTUROS_RUN, getRun);

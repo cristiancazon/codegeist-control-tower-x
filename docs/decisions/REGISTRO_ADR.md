@@ -10,6 +10,7 @@
 | ADR-006 | Aplicada en development | Calcular Overview con permisos de Jira y del proyecto de la app. Toda métrica mantiene su fuente y fecha. El cliente solo elige fase y fecha de corte | SDD-003 / AC003-01, AC003-03, AC003-04 |
 | ADR-007 | Aplicada en development | Usar snapshot de demo y mapeos Jira vigentes en las vistas operativas. Mostrar y autorizar por separado las conexiones de Assets, JSM y Confluence | SDD-004 / AC004-01 a AC004-04 |
 | ADR-008 | Aplicada en development | Congelar la entrada de Futuros por hashes. Procesar lotes deterministas de 100 y publicar una generación con concesión vigente | SDD-005 / AC005-01, AC005-04, AC005-06 |
+| ADR-009 | Aplicada en development | Publicar revisiones inmutables de A-17 con validación de la revisión de origen y acceso vigente. Usar referencias de corrida para navegar y consultar Agent X | SDD-006 / AC006-01 a AC006-04 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 
@@ -29,4 +30,8 @@ El 25 de noviembre de 2026 se implementaron ocho vistas para el proyecto autoriz
 
 El perfil V1 usa el snapshot sellado de Patagonia. El historial sintético queda congelado en el snapshot y Jira comprueba la visibilidad de todos sus ítems para cada actor interactivo. Se eligió el muestreo indexado con HMAC-SHA256 para que la semilla común sobreviva a la reentrega y al orden de los lotes. Forge SQL registra muestras compactas y un resultado con generación, que solo publica el dueño vigente de la concesión. El mismo snapshot y versiones habilitan la comparación emparejada mientras se conservan sus muestras. La edición general de escenarios y los lectores de otros perfiles dependen de contratos y validación adicionales. [Plan de Futuros](../../specs/005-futuros-engine/plan.md).
 
-El 26 de noviembre de 2026, Forge 3.6.0 publicó cuatro corridas de 4.000 muestras en Jira development. Forge SQL requirió límites constantes en las lecturas paginadas. El reintento conserva la configuración original y enlaza la nueva corrida al intento previo. El ensayo de capacidad de staging sigue pendiente. [Evidencia en Jira development](../../specs/005-futuros-engine/tests.md#resultados-en-jira-development-del-26-de-noviembre-de-2026).
+El 26 de noviembre de 2026, Forge 3.6.0 publicó cuatro corridas de 4.000 muestras en Jira development. Forge SQL requirió límites constantes en las lecturas paginadas. El reintento conserva la configuración original y enlaza la nueva corrida al intento previo. En Forge staging se midieron admisión y publicación, y se recuperaron dos corridas tras fallas controladas. [Evidencia de Futuros](../../specs/005-futuros-engine/tests.md).
+
+### ADR-009 · Revisión de escenarios y consulta de resultados
+
+El 26 de noviembre de 2026 se limitó la edición de Patagonia al atraso de A-17. La definición publicada conserva unidad, procedencia, revisión y hash. Una restricción por familia y revisión resuelve publicaciones concurrentes y deja accesibles las corridas anteriores. Un enlace a una corrida abre su detalle y vuelve a validar el acceso. Agent X aplica el mismo límite de lectura antes de recibir agregados. [Pruebas de la interfaz Futuros](../../specs/006-futuros-ui/tests.md).

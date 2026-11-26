@@ -22,6 +22,13 @@ type BatchSummary = { samples: Sample[]; criticalCounts: number[] };
 
 export type FuturosResultManifest = { snapshotAsOf: string; logical: LogicalSchedule; summary: StatisticsSummary };
 
+export type FuturosWorkerTiming = {
+  runId: string; processFirstInvocation: boolean; invocationMs: number; inputMs: number; computeMs: number;
+  persistenceAndCoordinationMs: number; savedBatches: number;
+  outcome: 'NOT_CLAIMED' | 'CLAIMED' | 'CONTINUED' | 'PUBLISHED' | 'FAILED' | 'INTERRUPTED';
+};
+type TimingObserver = (timing: FuturosWorkerTiming) => void;
+
 export type FuturosWorkerOptions = {
   loadInput(run: RunRecord): Promise<EngineInput>;
   store?: FuturosRunStore;
@@ -149,6 +156,7 @@ function enqueueRun(runId: string, delaySeconds: number) {
 
 export function createFuturosWorker({ loadInput, store = createRunStore(), push = enqueueRun,
   monotonicClock = () => performance.now(), invocationBudgetMs = defaultBudgetMs }: FuturosWorkerOptions) {
+  let processFirstInvocation = true;
   async function dispatch(runId: string, delaySeconds = 0): Promise<boolean> {
     if (!runIdPattern.test(runId) || !await store.reserveDispatch(runId, delaySeconds)) return false;
     try {
@@ -160,26 +168,34 @@ export function createFuturosWorker({ loadInput, store = createRunStore(), push 
     }
   }
 
-  async function consume(runId: string): Promise<void> {
-    if (!runIdPattern.test(runId)) return;
+  async function processRun(runId: string, timing?: FuturosWorkerTiming): Promise<void> {
+    const stamp = () => timing ? performance.now() : 0;
     const deadline = monotonicClock() + invocationBudgetMs;
     const lease = await store.claimRun(runId);
     if (!lease) return;
     const { run } = lease;
+    if (timing) timing.outcome = 'CLAIMED';
 
     async function continueLater(current: RunLease, delaySeconds: number) {
-      if (await store.releaseRun(current)) await dispatch(runId, delaySeconds);
+      if (await store.releaseRun(current)) {
+        await dispatch(runId, delaySeconds);
+        if (timing) timing.outcome = 'CONTINUED';
+      }
     }
 
     try {
+      const inputStart = stamp();
       const input = await loadInput(run);
       if (input.snapshotId !== run.snapshotId || input.scenarioId !== run.scenarioId || input.seed !== run.seed ||
           input.sampleCount !== run.sampleCount || inputDigest(input) !== run.inputHash) {
         throw new RunStoreError('STALE_INPUT');
       }
       if (run.modelVersion !== FUTUROS_MODEL || run.engineBuild !== FUTUROS_ENGINE_BUILD || run.rngVersion !== FUTUROS_RNG) modelFailure();
+      if (timing) timing.inputMs += stamp() - inputStart;
 
+      let computeStart = stamp();
       const prepared = prepareEngine(input);
+      if (timing) timing.computeMs += stamp() - computeStart;
       const count = Math.ceil(run.sampleCount / FUTUROS_BATCH_SIZE);
       const existing = new Set(await store.batchIndexes(runId));
       for (let index = 0; index < count; index += 1) {
@@ -189,12 +205,18 @@ export function createFuturosWorker({ loadInput, store = createRunStore(), push 
 
         const first = index * FUTUROS_BATCH_SIZE;
         const end = Math.min(first + FUTUROS_BATCH_SIZE, run.sampleCount);
+        computeStart = stamp();
         const values: Sample[] = [];
         for (let i = first; i < end; i += 1) values.push(prepared.sample(i));
-        if (!await store.saveBatch(lease, encodeBatch(index, values, prepared.logical.tasks.length))) return;
+        const batch = encodeBatch(index, values, prepared.logical.tasks.length);
+        if (timing) timing.computeMs += stamp() - computeStart;
+        if (!await store.saveBatch(lease, batch)) return;
+        if (timing) timing.savedBatches += 1;
       }
       if (monotonicClock() >= deadline) return await continueLater(lease, 0);
-      const data = decodeBatches(run, await store.listBatches(runId), prepared.logical.tasks.length);
+      const batches = await store.listBatches(runId);
+      computeStart = stamp();
+      const data = decodeBatches(run, batches, prepared.logical.tasks.length);
       if (!data) modelFailure();
       const summary = summarizeSamples(input, data.samples, {
         factorNames: prepared.factorNames, milestoneIds: prepared.milestoneIds, logical: prepared.logical,
@@ -202,13 +224,47 @@ export function createFuturosWorker({ loadInput, store = createRunStore(), push 
       });
       const manifest: FuturosResultManifest = { snapshotAsOf: input.asOf, logical: prepared.logical, summary };
       const json = canonicalJson(manifest);
-      if (await store.savePredictions(lease, predictionsFor(run, summary), input.horizon)) {
-        await store.publishRun(lease, sha256(json), json);
+      const predictions = predictionsFor(run, summary);
+      if (timing) timing.computeMs += stamp() - computeStart;
+      if (await store.savePredictions(lease, predictions, input.horizon)) {
+        const published = await store.publishRun(lease, sha256(json), json);
+        if (timing && published) timing.outcome = 'PUBLISHED';
       }
     } catch (error) {
       const code = errorCode(error);
-      if (code) await store.failRun(lease, code);
-      else await continueLater(lease, transientDelaySeconds);
+      if (code) {
+        const failed = await store.failRun(lease, code);
+        if (timing && failed) timing.outcome = 'FAILED';
+      } else {
+        await continueLater(lease, transientDelaySeconds);
+      }
+    }
+  }
+
+  async function consume(runId: string, observe?: TimingObserver): Promise<void> {
+    if (!runIdPattern.test(runId)) return;
+    const first = processFirstInvocation;
+    processFirstInvocation = false;
+    if (!observe) return processRun(runId);
+    const start = performance.now();
+    const timing: FuturosWorkerTiming = { runId, processFirstInvocation: first, invocationMs: 0, inputMs: 0, computeMs: 0,
+      persistenceAndCoordinationMs: 0, savedBatches: 0, outcome: 'NOT_CLAIMED' };
+    try {
+      await processRun(runId, timing);
+    } catch (error) {
+      timing.outcome = 'INTERRUPTED';
+      throw error;
+    } finally {
+      const invocationMs = performance.now() - start;
+      timing.invocationMs = Math.round(invocationMs);
+      timing.persistenceAndCoordinationMs = Math.round(Math.max(0, invocationMs - timing.inputMs - timing.computeMs));
+      timing.inputMs = Math.round(timing.inputMs);
+      timing.computeMs = Math.round(timing.computeMs);
+      try {
+        observe(timing);
+      } catch {
+        // A broken telemetry sink cannot affect the worker's durable outcome.
+      }
     }
   }
 

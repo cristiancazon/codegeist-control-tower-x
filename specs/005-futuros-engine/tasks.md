@@ -28,7 +28,7 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T005-03`.
 - Entrega. Implementar cola, guardas de duplicado y fencing, reconciliación y agregación final.
 - Verificación. Ejecutar [CT005-04](tests.md#ct005-04) y guardar evidencia de [AC005-04](acceptance.md#ac005-04).
-- Estado. Verificada con fallas simuladas en local y publicación y reintento en Jira development. Queda pendiente inyectar pérdidas de entrega en Forge.
+- Estado. Verificada con fallas simuladas en local y recuperación del mismo ID en Forge staging tras omitir el despacho y detener el worker.
 
 ### T005-05 · Fixture A-17
 
@@ -42,6 +42,6 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T005-05`.
 - Entrega. Ejecutar benchmark, registrar umbrales observados y fijar configuración de lote autorizada.
 - Verificación. Ejecutar [CT005-06](tests.md#ct005-06) y guardar evidencia de [AC005-06](acceptance.md#ac005-06).
-- Estado. El lote de 100 se ejecutó en Jira development. Queda pendiente medir p95, corridas frías y recuperación en Forge staging.
+- Estado. Verificada en Forge staging con dos series de 30 admisiones, 20 corridas cálidas, cinco primeras invocaciones y recuperación con hash reproducible.
 
 [Plan](plan.md) · [Plantilla de tarea](../../docs/templates/TASK.md).

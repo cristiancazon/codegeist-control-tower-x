@@ -12,13 +12,24 @@ type RuntimeContext = {
   installation?: { contexts: ReadonlyArray<{ toString(): string; cloudId?: string }> };
 };
 
-export function isConfiguredDemoProject(runtime: RuntimeContext, jiraProjectId: string, config: {
+type DemoTarget = {
   cloudId?: string;
   jiraProjectId?: string;
-}): boolean {
-  return runtime.environmentType === 'DEVELOPMENT' &&
-    typeof config.cloudId === 'string' && config.cloudId.length > 0 &&
+};
+
+function matchesDemoTarget(runtime: RuntimeContext, jiraProjectId: string, config: DemoTarget): boolean {
+  return typeof config.cloudId === 'string' && config.cloudId.length > 0 &&
     typeof config.jiraProjectId === 'string' && config.jiraProjectId === jiraProjectId &&
     runtime.installation?.contexts.some((site) =>
       site.cloudId === config.cloudId && site.toString().startsWith('ari:cloud:jira:')) === true;
+}
+
+export function isConfiguredDemoProject(runtime: RuntimeContext, jiraProjectId: string, config: DemoTarget): boolean {
+  return runtime.environmentType === 'DEVELOPMENT' && matchesDemoTarget(runtime, jiraProjectId, config);
+}
+
+export function isConfiguredStagingAdoption(
+  runtime: RuntimeContext, jiraProjectId: string, config: DemoTarget & { enabled?: string },
+): boolean {
+  return runtime.environmentType === 'STAGING' && config.enabled === 'true' && matchesDemoTarget(runtime, jiraProjectId, config);
 }
