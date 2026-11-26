@@ -31,8 +31,8 @@ export async function pruneAbandonedDemoSnapshotChunks(projectId: string, query:
        AND (s.state = 'BUILDING' OR (s.state = 'EXPIRED_BUILD' AND EXISTS (
          SELECT 1 FROM ctx_snapshot_chunk c WHERE c.snapshot_id = s.id
        )))
-     ORDER BY s.expires_at, s.id LIMIT ?`,
-    [projectId, snapshotLimit],
+     ORDER BY s.expires_at, s.id LIMIT ${snapshotLimit}`,
+    [projectId],
   );
 
   let snapshotsFenced = 0;
@@ -48,8 +48,8 @@ export async function pruneAbandonedDemoSnapshotChunks(projectId: string, query:
 
     const chunks = await query<{ chunk_index: number }>(
       `SELECT chunk_index FROM ctx_snapshot_chunk
-       WHERE snapshot_id = ? ORDER BY chunk_index LIMIT ?`,
-      [id, chunkLimit],
+       WHERE snapshot_id = ? ORDER BY chunk_index LIMIT ${chunkLimit}`,
+      [id],
     );
     if (!chunks.length) {
       continue;

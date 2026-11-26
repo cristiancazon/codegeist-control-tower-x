@@ -157,3 +157,48 @@ button:focus-visible {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+.futuros-settings {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 36rem;
+}
+
+.futuros-settings label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.futuros-settings input,
+.futuros-settings select {
+  font: inherit;
+  padding: 0.5rem;
+  color: var(--ds-text);
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border-input, #8590a2);
+  border-radius: 0.25rem;
+}
+
+.futuros-runs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+
+.futuros-runs > li {
+  padding: 0.75rem;
+  border: 1px solid var(--ds-border, #c1c7d0);
+  border-radius: 0.5rem;
+}
+
+.futuros-result dd {
+  margin-inline-start: 0;
+  font-weight: 600;
+}
+
+.futuros-digest {
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+}

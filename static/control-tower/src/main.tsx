@@ -5,6 +5,7 @@ import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../
 import { DemoBootstrap } from './demo-bootstrap';
 import { OverviewDashboard } from './overview';
 import { OperationsDashboard } from './operations';
+import { FuturosRunner } from './futuros-runner';
 import type { OperationsTarget } from '../../../src/shared/operations';
 import './styles.css';
 
@@ -97,7 +98,7 @@ function ForgeConnection() {
 
 function App() {
   const [hasOpenedTools, setHasOpenedTools] = useState(false);
-  const [viewName, setViewName] = useState<'overview' | 'operations'>('overview');
+  const [viewName, setViewName] = useState<'overview' | 'operations' | 'futuros'>('overview');
   const [target, setTarget] = useState<OperationsTarget>();
   const operationsNavigation = useRef<HTMLButtonElement>(null);
 
@@ -114,10 +115,12 @@ function App() {
           onClick={() => setViewName('overview')}>Vista general</button>
         <button type="button" ref={operationsNavigation} aria-current={viewName === 'operations' ? 'page' : undefined}
           onClick={() => openOperations()}>Explorar proyecto</button>
+        <button type="button" aria-current={viewName === 'futuros' ? 'page' : undefined}
+          onClick={() => setViewName('futuros')}>Futuros</button>
       </nav>
-      {viewName === 'overview'
-        ? <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />
-        : <OperationsDashboard initialTarget={target} />}
+      {viewName === 'overview' && <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />}
+      {viewName === 'operations' && <OperationsDashboard initialTarget={target} />}
+      {viewName === 'futuros' && <FuturosRunner />}
       <details className="installation-tools" onToggle={(event) => {
         if (event.currentTarget.open) {
           setHasOpenedTools(true);

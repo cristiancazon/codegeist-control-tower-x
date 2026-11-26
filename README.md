@@ -24,7 +24,7 @@ Especificación y paquete SDD de una torre de control inteligente para megaproye
 | [009](specs/009-decisions/spec.md) | Aprobación y escritura correctiva en Jira |
 | [010](specs/010-release/spec.md) | Candidato, ensayo y entrega |
 
-La página del proyecto Jira abre Overview con filtros, indicadores y la cadena de impacto de A-17. **Explorar proyecto** reúne el trabajo, las operaciones, los activos, los contratistas, los envíos, HSE, los costes y las referencias. **Estado de la instalación** muestra la conexión de Forge y ofrece la carga de demostración a la cuenta administradora habilitada. Las vistas usan la cuenta activa de Jira y un rol vigente de Control Tower X.
+La página del proyecto Jira abre Overview con filtros, indicadores y la cadena de impacto de A-17. **Explorar proyecto** reúne las vistas operativas. **Futuros** permite consultar escenarios publicados y, con `PLANNER`, iniciar corridas reproducibles. **Estado de la instalación** muestra la conexión de Forge y ofrece la carga de demostración a la cuenta administradora habilitada. Las vistas usan la cuenta activa de Jira y un rol vigente de Control Tower X.
 
 ## Verificación local
 
@@ -55,5 +55,9 @@ forge install --upgrade all -e development --product jira --demo-site
 ```
 
 Abrí **Control Tower X** en PED con una cuenta que pueda administrar el proyecto, ver sus ítems y crearlos. En **Datos de demostración**, revisá el plan de carga de 120 ítems antes de confirmarlo. Podés reanudar una importación desde el mismo destino y la misma cuenta. Si Jira no confirma una creación, el botón de reanudación consulta de nuevo su marcador para recuperar el vínculo. Consultá el [registro de pruebas](specs/002-data-model/tests.md) para ver el estado de la verificación.
+
+### Corridas de Futuros
+
+Con el snapshot de demo publicado y el rol `PLANNER` en PED, abrí **Futuros**. Fijá la cantidad de muestras y la semilla compartida, iniciá S0, S1 y S2, y actualizá las corridas activas hasta que publiquen. La comparación usa resultados del mismo snapshot y semilla. Si una corrida propia venció, el reintento conserva sus parámetros y el historial. [Resultados de Jira development](specs/005-futuros-engine/tests.md#resultados-en-jira-development-del-26-de-noviembre-de-2026).
 
 Consultar la [arquitectura](docs/architecture/ARQUITECTURA.md), el [registro de decisiones](docs/decisions/REGISTRO_ADR.md) y las [plantillas](docs/templates/).

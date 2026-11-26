@@ -18,6 +18,11 @@ modules:
     - key: publish-patagonia
       handler: server/data/bootstrap/publish.publish
       timeoutSeconds: 180
+    - key: run-futuros
+      handler: server/futuros/runtime.runFuturos
+      timeoutSeconds: 120
+    - key: recover-futuros-runs
+      handler: server/futuros/runtime.recoverFuturos
   sql:
     - key: control-tower-db
       engine: mysql
@@ -34,10 +39,16 @@ modules:
     - key: consume-patagonia-fixture
       queue: ctx-fixture-publish
       function: publish-patagonia
+    - key: consume-futuros
+      queue: ctx-futuros
+      function: run-futuros
   scheduledTrigger:
     - key: retry-schema-migrations
       function: maintain-demo-data
       interval: hour
+    - key: retry-futuros-runs
+      function: recover-futuros-runs
+      interval: fiveMinute
 resources:
   - key: project-ui
     path: static/control-tower/dist

@@ -9,6 +9,7 @@
 | ADR-005 | Verificada localmente el 25 de noviembre de 2026 | Habilitar el seed mediante sitio, proyecto y entorno Forge explícitos. Conciliar Jira con la identidad activa y registrar el vínculo en Forge SQL para reanudar | SDD-002 / AC002-02, AC002-04, AC002-05 |
 | ADR-006 | Aplicada en development | Calcular Overview con permisos de Jira y del proyecto de la app. Toda métrica mantiene su fuente y fecha. El cliente solo elige fase y fecha de corte | SDD-003 / AC003-01, AC003-03, AC003-04 |
 | ADR-007 | Aplicada en development | Usar snapshot de demo y mapeos Jira vigentes en las vistas operativas. Mostrar y autorizar por separado las conexiones de Assets, JSM y Confluence | SDD-004 / AC004-01 a AC004-04 |
+| ADR-008 | Aplicada en development | Congelar la entrada de Futuros por hashes. Procesar lotes deterministas de 100 y publicar una generación con concesión vigente | SDD-005 / AC005-01, AC005-04, AC005-06 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 
@@ -23,3 +24,9 @@ El 25 de noviembre de 2026 se adoptó la lectura Jira por usuario en cada consul
 ### ADR-007 · Origen y permisos en las vistas operativas
 
 El 25 de noviembre de 2026 se implementaron ocho vistas para el proyecto autorizado. El backend consulta Jira como usuario activo para validar cada ítem vinculado y consulta Forge SQL para los catálogos sintéticos del snapshot. Cada detalle vuelve a comprobar el rol de proyecto. HSE exige `HSE_READER` adicional y Conocimiento solo usa el catálogo vinculado al fixture sellado. Los conectores quedan sin habilitar hasta confirmar su ámbito, sus permisos y la lectura en el sitio. [Plan de SDD-004](../../specs/004-projects-assets/plan.md).
+
+### ADR-008 · Reproducibilidad y publicación de Futuros
+
+El perfil V1 usa el snapshot sellado de Patagonia. El historial sintético queda congelado en el snapshot y Jira comprueba la visibilidad de todos sus ítems para cada actor interactivo. Se eligió el muestreo indexado con HMAC-SHA256 para que la semilla común sobreviva a la reentrega y al orden de los lotes. Forge SQL registra muestras compactas y un resultado con generación, que solo publica el dueño vigente de la concesión. El mismo snapshot y versiones habilitan la comparación emparejada mientras se conservan sus muestras. La edición general de escenarios y los lectores de otros perfiles dependen de contratos y validación adicionales. [Plan de Futuros](../../specs/005-futuros-engine/plan.md).
+
+El 26 de noviembre de 2026, Forge 3.6.0 publicó cuatro corridas de 4.000 muestras en Jira development. Forge SQL requirió límites constantes en las lecturas paginadas. El reintento conserva la configuración original y enlaza la nueva corrida al intento previo. El ensayo de capacidad de staging sigue pendiente. [Evidencia en Jira development](../../specs/005-futuros-engine/tests.md#resultados-en-jira-development-del-26-de-noviembre-de-2026).
