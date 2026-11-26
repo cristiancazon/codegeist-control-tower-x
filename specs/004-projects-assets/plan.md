@@ -8,19 +8,19 @@ SDD-002 y contrato de fuentes. Para lectores opcionales comprobar las capacidade
 
 ### R004-01 · Proyecto y dependencias
 
-Preservar identidad estable de las issues y leer el origen con permisos del actor. Usar modelo de dependencias del plan para relaciones calculadas.
+Cruzar el identificador estable de Jira con el mapeo vigente de Forge SQL. Aplicar filtros y paginación de a 20 sobre las filas visibles. Volver a verificar visibilidad en cada detalle y omitir las aristas con un extremo inaccesible. [API de búsqueda Jira](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/).
 
 ### R004-02 · Recursos y proveedores
 
-Unificar DTO con fuente, fecha de corte, calidad y disponibilidad. Una integración deshabilitada conserva el estado de demo según §2 y §3.
+Mostrar la procedencia y el corte del snapshot para equipos, proveedores y envíos sintéticos. Adjuntar trabajo y recepciones solo tras la lectura común de Jira. Indicar «Sin habilitar» para el conector Assets hasta validar el workspace y el acceso a los objetos. [API de Assets](https://developer.atlassian.com/cloud/assets/rest/api-group-object/).
 
 ### R004-03 · HSE, costes y conocimiento
 
-Control de clearance HSE, monedas declaradas y procedencia. Los usuarios no autorizados tampoco reciben filtraciones mediante aggregates o enlaces.
+Exigir rol de proyecto más `HSE_READER` antes de consultar incidentes. Mantener enteros en centavos y separar devengado, base remanente y tarifas. El catálogo de conocimiento sintético exige el fixture publicado y los permisos de sus referencias Jira. JSM y Confluence requieren autorización propia para conectar contenido real. [API de solicitudes de JSM](https://developer.atlassian.com/cloud/jira/service-desk/rest/api-group-request/) · [API de páginas de Confluence](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/).
 
 ### R004-04 · Fallos de origen
 
-Mapear estados de fuente y comprobar ACL nuevamente al acceder a un detalle. Acotar reintentos e invalidar caché aplicable.
+Mostrar fuente parcial, no disponible o sin habilitar y distinguirla de un listado vacío. Revalidar cuentas, roles y visibilidad en cada activación de lista o detalle. Los logs registran códigos de fuente, identificador de soporte y duración.
 
 ## Evidencia por entorno
 

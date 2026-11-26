@@ -8,6 +8,7 @@
 | ADR-004 | Sujeta a pruebas en sitio | Accesos opcionales por instalación. Mostrar procedencia alternativa o funcionalidad deshabilitada cuando corresponda | SDD-008 / AC008-01 a AC008-04 |
 | ADR-005 | Verificada localmente el 25 de noviembre de 2026 | Habilitar el seed mediante sitio, proyecto y entorno Forge explícitos. Conciliar Jira con la identidad activa y registrar el vínculo en Forge SQL para reanudar | SDD-002 / AC002-02, AC002-04, AC002-05 |
 | ADR-006 | Aplicada en development | Calcular Overview con permisos de Jira y del proyecto de la app. Toda métrica mantiene su fuente y fecha. El cliente solo elige fase y fecha de corte | SDD-003 / AC003-01, AC003-03, AC003-04 |
+| ADR-007 | Aplicada en development | Usar snapshot de demo y mapeos Jira vigentes en las vistas operativas. Mostrar y autorizar por separado las conexiones de Assets, JSM y Confluence | SDD-004 / AC004-01 a AC004-04 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 
@@ -18,3 +19,7 @@ La clave de un proyecto puede repetirse en varios sitios Jira. Se eligieron dos 
 ### ADR-006 · Visibilidad de los indicadores de Overview
 
 El 25 de noviembre de 2026 se adoptó la lectura Jira por usuario en cada consulta y el cruce por ID con las proyecciones Forge. El denominador de una métrica de Jira corresponde a los ítems elegibles visibles. Una búsqueda incompleta informa el estado de la fuente y la cobertura. Cambiar la fecha de corte permite evaluar vencimientos usando los estados Jira observados durante la consulta. Los datos sintéticos con fecha fija conservan el corte de su snapshot. Reevaluar este diseño cuando exista captura histórica autorizada de Jira o se habiliten datos reales de Assets y JSM. [Búsqueda Jira](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/) · [Plan de Overview](../../specs/003-dashboard/plan.md).
+
+### ADR-007 · Origen y permisos en las vistas operativas
+
+El 25 de noviembre de 2026 se implementaron ocho vistas para el proyecto autorizado. El backend consulta Jira como usuario activo para validar cada ítem vinculado y consulta Forge SQL para los catálogos sintéticos del snapshot. Cada detalle vuelve a comprobar el rol de proyecto. HSE exige `HSE_READER` adicional y Conocimiento solo usa el catálogo vinculado al fixture sellado. Los conectores quedan sin habilitar hasta confirmar su ámbito, sus permisos y la lectura en el sitio. [Plan de SDD-004](../../specs/004-projects-assets/plan.md).

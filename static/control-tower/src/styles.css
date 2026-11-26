@@ -15,6 +15,30 @@ body {
   padding: clamp(1rem, 3vw, 2.5rem);
 }
 
+.app-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-100, 0.5rem);
+  margin-block-end: var(--ds-space-200, 1rem);
+}
+
+.app-navigation button {
+  margin: 0;
+  border: 1px solid var(--ds-border, #c1c7d0);
+  color: var(--ds-text, #172b4d);
+  background: var(--ds-surface, #fff);
+}
+
+.app-navigation button:hover {
+  background: var(--ds-background-neutral-hovered, #f1f2f4);
+}
+
+.app-navigation button[aria-current='page'] {
+  border-color: var(--ds-border-selected, #0c66e4);
+  color: var(--ds-text-selected, #0055cc);
+  background: var(--ds-background-selected, #e9f2ff);
+}
+
 .installation-tools {
   margin-block-start: 1.5rem;
   padding-block: 0.75rem;

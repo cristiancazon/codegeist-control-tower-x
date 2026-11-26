@@ -1,9 +1,11 @@
 import { makeInvoke, view } from '@forge/bridge';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
 import { DemoBootstrap } from './demo-bootstrap';
 import { OverviewDashboard } from './overview';
+import { OperationsDashboard } from './operations';
+import type { OperationsTarget } from '../../../src/shared/operations';
 import './styles.css';
 
 const invoke = makeInvoke<{ [HEALTH_OPERATION]: () => HealthResponse | undefined }>();
@@ -95,9 +97,27 @@ function ForgeConnection() {
 
 function App() {
   const [hasOpenedTools, setHasOpenedTools] = useState(false);
+  const [viewName, setViewName] = useState<'overview' | 'operations'>('overview');
+  const [target, setTarget] = useState<OperationsTarget>();
+  const operationsNavigation = useRef<HTMLButtonElement>(null);
+
+  function openOperations(next?: OperationsTarget) {
+    setTarget(next);
+    setViewName('operations');
+    operationsNavigation.current?.focus();
+  }
+
   return (
     <main className="page">
-      <OverviewDashboard />
+      <nav className="app-navigation" aria-label="Vistas de Control Tower X">
+        <button type="button" aria-current={viewName === 'overview' ? 'page' : undefined}
+          onClick={() => setViewName('overview')}>Vista general</button>
+        <button type="button" ref={operationsNavigation} aria-current={viewName === 'operations' ? 'page' : undefined}
+          onClick={() => openOperations()}>Explorar proyecto</button>
+      </nav>
+      {viewName === 'overview'
+        ? <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />
+        : <OperationsDashboard initialTarget={target} />}
       <details className="installation-tools" onToggle={(event) => {
         if (event.currentTarget.open) {
           setHasOpenedTools(true);

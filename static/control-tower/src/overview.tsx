@@ -202,7 +202,9 @@ function AlertDetail({ filters, id }: { filters: OverviewFilters; id: string }) 
   );
 }
 
-function AlertCard({ alert, filters }: { alert: OverviewAlert; filters: OverviewFilters }) {
+function AlertCard({ alert, filters, onOpenLogistics }: {
+  alert: OverviewAlert; filters: OverviewFilters; onOpenLogistics?: (code: OverviewAlert['code']) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const detailId = `ov-alert-${alert.code}-detail`;
   return (
@@ -221,7 +223,11 @@ function AlertCard({ alert, filters }: { alert: OverviewAlert; filters: Overview
             onClick={() => setExpanded(!expanded)}>{expanded ? 'Ocultar cadena' : 'Ver cadena de impacto'}</button>
         </div>
       </div>
-      {expanded && <AlertDetail id={detailId} filters={filters} />}
+      {expanded && <>
+        <AlertDetail id={detailId} filters={filters} />
+        {onOpenLogistics && <button type="button" className="ov-secondary"
+          onClick={() => onOpenLogistics(alert.code)}>Abrir A-17 en Logística</button>}
+      </>}
     </article>
   );
 }
@@ -286,7 +292,9 @@ function Sources({ sources }: { sources: OverviewSource[] }) {
   );
 }
 
-export function OverviewDashboard() {
+export function OverviewDashboard({ onOpenLogistics }: {
+  onOpenLogistics?: (code: OverviewAlert['code']) => void;
+}) {
   const [load, setLoad] = useState<LoadState<Overview>>(loading);
   const [phases, setPhases] = useState<Overview['phases']>([]);
   const [draftPhase, setDraftPhase] = useState('');
@@ -367,7 +375,8 @@ export function OverviewDashboard() {
             <p className="ov-coverage" role="status">{sourceCoverage} El estado de cada fuente figura al pie de la vista.</p>}
           {!!overview.alerts.length && <section aria-labelledby="ov-alerts">
             <h2 className="ov-section-title" id="ov-alerts">Alertas prioritarias</h2>
-            {overview.alerts.map((alert) => <AlertCard alert={alert} filters={request.filters} key={alert.code} />)}
+            {overview.alerts.map((alert) => <AlertCard alert={alert} filters={request.filters}
+              onOpenLogistics={onOpenLogistics} key={alert.code} />)}
           </section>}
           <section aria-labelledby="ov-indicators">
             <h2 className="ov-section-title" id="ov-indicators">Indicadores</h2>
