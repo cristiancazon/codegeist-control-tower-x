@@ -1,5 +1,5 @@
-import { makeInvoke, router } from '@forge/bridge';
-import { useEffect, useState, type FormEvent } from 'react';
+import { makeInvoke, router, rovo } from '@forge/bridge';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import {
   OVERVIEW_ALERT, OVERVIEW_GET, type Overview, type OverviewAlert, type OverviewAlertDetail,
   type OverviewErrorCode, type OverviewFilters, type OverviewMetric, type OverviewResult, type OverviewSource,
@@ -143,7 +143,61 @@ function MetricCard({ metric, currency }: { metric: OverviewMetric; currency: st
   );
 }
 
-function AlertDetail({ filters, id }: { filters: OverviewFilters; id: string }) {
+function A17AgentHandoff({ jiraProjectId }: { jiraProjectId?: string }) {
+  const promptId = useId();
+  const field = useRef<HTMLTextAreaElement>(null);
+  const [opening, setOpening] = useState(false);
+  const [message, setMessage] = useState('');
+  if (!jiraProjectId || !/^[1-9][0-9]{0,31}$/.test(jiraProjectId)) return null;
+  const prompt = `Consultá la evidencia de A-17 en el proyecto Jira con ID ${jiraProjectId} usando el filtro a17. `
+    + 'Explicá la cadena de impacto y citá sus referencias, la fecha de corte y los límites de cobertura. '
+    + 'Distinguí los hechos registrados de los efectos previstos.';
+
+  async function openAgent() {
+    setOpening(true);
+    setMessage('');
+    try {
+      if (await rovo.isEnabled()) {
+        await rovo.open({ type: 'forge', agentKey: 'control-tower-agent-x', agentName: 'Agent X', prompt });
+      } else {
+        setMessage('Rovo no está habilitado en este sitio. Podés copiar la consulta para conservar la referencia.');
+      }
+    } catch {
+      setMessage('No se pudo abrir Agent X. Si tenés acceso a Rovo Chat, podés abrirlo desde Jira y pegar la consulta.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setMessage('Consulta copiada.');
+    } catch {
+      field.current?.focus();
+      field.current?.select();
+      setMessage('La consulta quedó seleccionada. Copiala con el atajo de tu dispositivo.');
+    }
+  }
+
+  return <details className="ov-agent-handoff">
+    <summary>Consultar a Agent X</summary>
+    <div className="ov-agent-body">
+      <p className="ov-note">Agent X vuelve a comprobar el acceso. Para abrirlo manualmente, elegí Agent X en Rovo Chat de Jira y pegá la consulta.</p>
+      <label htmlFor={promptId}>Consulta sobre A-17</label>
+      <textarea id={promptId} ref={field} rows={3} value={prompt} readOnly />
+      <div className="ov-agent-actions">
+        <button type="button" className="ov-primary" disabled={opening} onClick={() => void openAgent()}>
+          {opening ? 'Abriendo Agent X…' : 'Abrir Agent X'}
+        </button>
+        <button type="button" className="ov-secondary" onClick={() => void copyPrompt()}>Copiar consulta</button>
+      </div>
+    </div>
+    <p className="ov-note ov-agent-status" role="status">{message}</p>
+  </details>;
+}
+
+function AlertDetail({ filters, id, jiraProjectId }: { filters: OverviewFilters; id: string; jiraProjectId?: string }) {
   const [load, setLoad] = useState<LoadState<OverviewAlertDetail>>(loading);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -196,14 +250,16 @@ function AlertDetail({ filters, id }: { filters: OverviewFilters; id: string }) 
             </div>
             <strong>{number.format(load.data.simulationInput.value)} días</strong>
           </div>}
+          <A17AgentHandoff jiraProjectId={jiraProjectId} />
         </>
       )}
     </section>
   );
 }
 
-function AlertCard({ alert, filters, onOpenLogistics }: {
-  alert: OverviewAlert; filters: OverviewFilters; onOpenLogistics?: (code: OverviewAlert['code']) => void;
+function AlertCard({ alert, filters, jiraProjectId, onOpenLogistics }: {
+  alert: OverviewAlert; filters: OverviewFilters; jiraProjectId?: string;
+  onOpenLogistics?: (code: OverviewAlert['code']) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = `ov-alert-${alert.code}-detail`;
@@ -224,7 +280,7 @@ function AlertCard({ alert, filters, onOpenLogistics }: {
         </div>
       </div>
       {expanded && <>
-        <AlertDetail id={detailId} filters={filters} />
+        <AlertDetail id={detailId} filters={filters} jiraProjectId={jiraProjectId} />
         {onOpenLogistics && <button type="button" className="ov-secondary"
           onClick={() => onOpenLogistics(alert.code)}>Abrir A-17 en Logística</button>}
       </>}
@@ -375,7 +431,7 @@ export function OverviewDashboard({ onOpenLogistics }: {
             <p className="ov-coverage" role="status">{sourceCoverage} El estado de cada fuente figura al pie de la vista.</p>}
           {!!overview.alerts.length && <section aria-labelledby="ov-alerts">
             <h2 className="ov-section-title" id="ov-alerts">Alertas prioritarias</h2>
-            {overview.alerts.map((alert) => <AlertCard alert={alert} filters={request.filters}
+            {overview.alerts.map((alert) => <AlertCard alert={alert} filters={request.filters} jiraProjectId={overview.project.jiraProjectId}
               onOpenLogistics={onOpenLogistics} key={alert.code} />)}
           </section>}
           <section aria-labelledby="ov-indicators">

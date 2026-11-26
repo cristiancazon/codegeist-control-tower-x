@@ -1,11 +1,10 @@
 import { NeedsAuthenticationError } from '@forge/api';
 import type { Distribution, StatisticsSummary } from '../../domain/futuros/statistics';
 import type { FuturosFailure, FuturosRun } from '../../shared/futuros';
-import { isJiraId, isRecord, isText } from '../data/jira/normalize';
+import { isRecord } from '../data/jira/normalize';
 import { getRun } from '../futuros/resolvers';
+import { actorFrom, authorizedRunPath, isRunReference, resolveJiraProjectReference, rovoProjectContext } from './context';
 
-const runIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
-const accountIdPattern = /^[^\s\p{Cc}]{1,128}$/u;
 const statusMessages = {
   AUTH_REQUIRED: 'Se requiere una sesión autorizada para consultar Futuros en Jira.',
   INVALID_REFERENCE: 'Proporcioná el identificador exacto de la corrida y el ID numérico del proyecto Jira.',
@@ -20,22 +19,10 @@ function fail(code: ActionFailure) {
   return { ok: false as const, error: { code, message: statusMessages[code] } };
 }
 
-function actorFrom(context: unknown) {
-  if (!isRecord(context) || context.accountType === 'anonymous' || !isText(context.installContext, 512)) return;
-  // This is the trusted second argument from the Forge function, independent of
-  // the action payload and its optional page context.
-  const direct = context.accountId;
-  const principal = isRecord(context.principal) ? context.principal.accountId : undefined;
-  if (direct !== undefined && principal !== undefined && direct !== principal) return;
-  const accountId = direct ?? principal;
-  if (typeof accountId !== 'string' || !accountIdPattern.test(accountId)) return;
-  return { accountId, installContext: context.installContext };
-}
-
 function selectorsFrom(payload: unknown) {
-  if (!isRecord(payload) || typeof payload.runId !== 'string' || !runIdPattern.test(payload.runId)
-    || !isJiraId(payload.jiraProjectId)) return;
-  return { runId: payload.runId, jiraProjectId: payload.jiraProjectId };
+  if (!isRecord(payload) || !isRunReference(payload.runId)) return;
+  const jiraProjectId = resolveJiraProjectReference(payload.jiraProjectId);
+  if (jiraProjectId) return { runId: payload.runId, jiraProjectId };
 }
 
 function errorFrom(code: FuturosFailure): ActionFailure {
@@ -51,8 +38,10 @@ function success({ probability, wilson95, bounds, unknown }: StatisticsSummary['
   return { probability, wilson95, bounds, unknown };
 }
 
-function projectedRun(run: FuturosRun, requestId: string) {
-  const reference = { source: 'Futuros' as const, runId: run.id, scenarioId: run.scenarioId, snapshotId: run.snapshotId };
+function projectedRun(run: FuturosRun, requestId: string, jiraProjectId: string) {
+  const path = authorizedRunPath(jiraProjectId, run.id);
+  const reference = { source: 'Futuros' as const, runId: run.id, scenarioId: run.scenarioId, snapshotId: run.snapshotId,
+    ...(path ? { url: path } : {}) };
   if (run.status !== 'SUCCEEDED') return { ok: true as const, status: run.status, reference, requestId };
   if (!run.result || !run.resultHash || !run.snapshotAsOf) return fail('NOT_AVAILABLE');
 
@@ -61,10 +50,11 @@ function projectedRun(run: FuturosRun, requestId: string) {
     ok: true as const, status: run.status, requestId,
     reference: {
       ...reference, snapshotAsOf: run.snapshotAsOf, inputHash: run.inputHash, resultHash: run.resultHash,
-      modelVersion: run.modelVersion, engineBuild: run.engineBuild, rngVersion: run.rngVersion,
+      modelVersion: run.modelVersion, engineBuild: run.engineBuild, rngVersion: run.rngVersion, finishedAt: run.finishedAt,
     },
     result: {
       sourceClass: 'SYNTHETIC_DEMO' as const, sampleCount, censoredCount, distributionIncomplete,
+      recommendationsAllowed: run.result.recommendationsAllowed,
       finishDay: { unit: 'DAY' as const, ...quantiles(finishDay) },
       costCents: { unit: 'USD_CENT' as const, ...quantiles(costCents) },
       success: { deadline: success(objectives.deadline), budget: success(objectives.budget), joint: success(objectives.joint) },
@@ -81,12 +71,11 @@ export function createReadFuturosResult(read: ReadRun = getRun) {
     try {
       // The existing read boundary revalidates Jira Browse as the current user,
       // project membership, source visibility and the published snapshot.
-      const response = await read({ payload: { runId: selectors.runId }, context: {
-        ...actor, extension: { project: { id: selectors.jiraProjectId } },
-      } });
+      const response = await read({ payload: { runId: selectors.runId },
+        context: rovoProjectContext(actor, selectors.jiraProjectId) });
       if (!response.ok) return fail(errorFrom(response.error.code));
       if (response.data.id !== selectors.runId) return fail('NOT_AVAILABLE');
-      return projectedRun(response.data, response.requestId);
+      return projectedRun(response.data, response.requestId, selectors.jiraProjectId);
     } catch (error) {
       return fail(error instanceof NeedsAuthenticationError ? 'AUTH_REQUIRED' : 'TEMPORARILY_UNAVAILABLE');
     }

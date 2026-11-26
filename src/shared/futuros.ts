@@ -72,7 +72,14 @@ export type FuturosCatalog = {
   canStart: boolean;
   canConfigureDemoPlanner: boolean;
 };
-export type FuturosComparison = { baselineId: string; items: Array<{ runId: string; comparison: PairedComparison }> };
+export type FuturosResultReference = Pick<FuturosRun,
+  'id' | 'scenarioId' | 'snapshotId' | 'snapshotAsOf' | 'modelVersion' | 'engineBuild' | 'rngVersion' |
+  'resultHash' | 'finishedAt' | 'sampleCount'>;
+export type FuturosComparison = {
+  baselineId: string;
+  items: Array<{ runId: string; comparison: PairedComparison }>;
+  references?: FuturosResultReference[];
+};
 export type FuturosFailure =
   | 'AUTH_REQUIRED' | 'FORBIDDEN' | 'INVALID_REQUEST' | 'INVALID_SCENARIO' | 'INSUFFICIENT_DATA'
   | 'RESOURCE_INFEASIBLE' | 'CONFLICT' | 'STALE_INPUT' | 'RUN_NOT_READY' | 'MODEL_UNAVAILABLE'

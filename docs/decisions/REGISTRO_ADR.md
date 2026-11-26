@@ -11,6 +11,7 @@
 | ADR-007 | Aplicada en development | Usar snapshot de demo y mapeos Jira vigentes en las vistas operativas. Mostrar y autorizar por separado las conexiones de Assets, JSM y Confluence | SDD-004 / AC004-01 a AC004-04 |
 | ADR-008 | Aplicada en development | Congelar la entrada de Futuros por hashes. Procesar lotes deterministas de 100 y publicar una generación con concesión vigente | SDD-005 / AC005-01, AC005-04, AC005-06 |
 | ADR-009 | Aplicada en development | Publicar revisiones inmutables de A-17 con validación de la revisión de origen y acceso vigente. Usar referencias de corrida para navegar y consultar Agent X | SDD-006 / AC006-01 a AC006-04 |
+| ADR-010 | Aplicada en development | Exponer a Agent X cinco acciones de lectura con identidad de Forge, comprobación de acceso vigente y proyección explícita de procedencia | SDD-007 / AC007-01 a AC007-04 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 
@@ -35,3 +36,7 @@ El 26 de noviembre de 2026, Forge 3.6.0 publicó cuatro corridas de 4.000 muestr
 ### ADR-009 · Revisión de escenarios y consulta de resultados
 
 El 26 de noviembre de 2026 se limitó la edición de Patagonia al atraso de A-17. La definición publicada conserva unidad, procedencia, revisión y hash. Una restricción por familia y revisión resuelve publicaciones concurrentes y deja accesibles las corridas anteriores. Un enlace a una corrida abre su detalle y vuelve a validar el acceso. Agent X aplica el mismo límite de lectura antes de recibir agregados. [Pruebas de la interfaz Futuros](../../specs/006-futuros-ui/tests.md).
+
+### ADR-010 · Evidencia autorizada en Rovo
+
+Agent X toma la identidad del contexto de invocación de Forge. El ID del proyecto, los UUID de corrida y los filtros se tratan como selectores. Se reutilizan las verificaciones de Jira y Control Tower X de las pantallas. Las respuestas proyectan el corte, las unidades, las referencias y las métricas publicadas sin incluir texto Jira ajeno a la consulta. El catálogo de conocimiento se etiqueta como sintético y declara el conector Confluence deshabilitado. [Plan de Agent X](../../specs/007-agent-x/plan.md) · [Contrato de acciones Forge](https://developer.atlassian.com/platform/forge/manifest-reference/modules/rovo-action/).

@@ -326,13 +326,17 @@ export const compareRuns = (request: Request) => protect<FuturosComparison>(FUTU
     run.rngVersion !== baseline.rngVersion || run.engineBuild !== baseline.engineBuild)) {
     throw new FuturosError('INCOMPATIBLE_RUNS');
   }
+  const references = records.map((record) => {
+    const { id, scenarioId, snapshotId, snapshotAsOf, modelVersion, engineBuild, rngVersion, resultHash, finishedAt, sampleCount } = runView(record);
+    return { id, scenarioId, snapshotId, snapshotAsOf, modelVersion, engineBuild, rngVersion, resultHash, finishedAt, sampleCount };
+  });
   const materialized = await Promise.all(records.map(async (run) => ({
     run, input: await loadFuturosRunInput(run), samples: await readRunSamples(run, futurosRunStore),
   })));
   if (materialized.some(({ run, input }) => inputDigest(input) !== run.inputHash)) throw new FuturosError('STALE_INPUT');
   if (materialized.some(({ samples }) => !samples)) throw new FuturosError('SAMPLES_EXPIRED');
   const base = materialized[0]!;
-  return { baselineId, items: materialized.slice(1).map(({ run, input, samples }) => ({
+  return { baselineId, references, items: materialized.slice(1).map(({ run, input, samples }) => ({
     runId: run.id, comparison: compareSamples(base.input, base.samples!, input, samples!),
   })) };
 });

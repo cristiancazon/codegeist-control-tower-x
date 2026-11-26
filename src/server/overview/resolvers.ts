@@ -12,7 +12,8 @@ import { readOverviewAlert } from './alert';
 import { readOverview } from './model';
 
 type Request = { payload?: unknown; context?: unknown };
-type Operation = typeof OVERVIEW_GET | typeof OVERVIEW_ALERT;
+const AGENT_A17 = 'agent-x.projectEvidence.a17';
+type Operation = typeof OVERVIEW_GET | typeof OVERVIEW_ALERT | typeof AGENT_A17;
 type Jira = Pick<JiraProjectAdapter, 'projectId' | 'assertBrowsePermission' | 'searchWorkItems'>;
 
 type OverviewLog = {
@@ -136,7 +137,8 @@ async function authorize(context: unknown, dependencies: Dependencies) {
 export function createOverviewResolvers(dependencies: Dependencies) {
   async function resolve<T>(
     operation: Operation, request: Request,
-    fetch: (projectId: string, filters: OverviewFilters, jira: Awaited<ReturnType<typeof readVisibleJiraIssues>>) =>
+    fetch: (projectId: string, filters: OverviewFilters, jira: Awaited<ReturnType<typeof readVisibleJiraIssues>>,
+      jiraProjectId: string) =>
       Promise<{ data: T; sources: Array<Pick<OverviewSource, 'source' | 'state'>> }>,
   ): Promise<OverviewResult<T>> {
     const requestId = randomUUID();
@@ -150,7 +152,7 @@ export function createOverviewResolvers(dependencies: Dependencies) {
     try {
       const filters = parseFilters(request.payload, operation);
       const { jira, projectId } = await authorize(request.context, dependencies);
-      const result = await fetch(projectId, filters, await readVisibleJiraIssues(jira));
+      const result = await fetch(projectId, filters, await readVisibleJiraIssues(jira), jira.projectId);
       log(result.sources.every((source) => source.state === 'READY') ? 'READY' : 'PARTIAL', { sources: result.sources });
       return { ok: true, data: result.data, requestId };
     } catch (error) {
@@ -171,14 +173,17 @@ export function createOverviewResolvers(dependencies: Dependencies) {
   }
 
   return {
-    get: (request: Request) => resolve<Overview>(OVERVIEW_GET, request, async (projectId, filters, jira) => {
+    get: (request: Request) => resolve<Overview>(OVERVIEW_GET, request, async (projectId, filters, jira, jiraProjectId) => {
       const data = await dependencies.readOverview({
         projectId, filters, jiraIssues: jira.issues, jiraState: jira.state, observedAt: dependencies.now().toISOString(),
       });
       if (!data) {
         throw new OverviewFailure('NOT_READY');
       }
-      return { data, sources: data.sources.map(({ source, state }) => ({ source, state })) };
+      return {
+        data: { ...data, project: { ...data.project, jiraProjectId } },
+        sources: data.sources.map(({ source, state }) => ({ source, state })),
+      };
     }),
     alert: (request: Request) => resolve<OverviewAlertDetail>(OVERVIEW_ALERT, request, async (projectId, filters, jira) => {
       if (!jira.issues) {
@@ -189,6 +194,20 @@ export function createOverviewResolvers(dependencies: Dependencies) {
         throw new OverviewFailure('FORBIDDEN');
       }
       return { data, sources: [{ source: 'JIRA', state: jira.state }, { source: 'FORGE', state: 'READY' }] };
+    }),
+    agentA17: (request: Request) => resolve(AGENT_A17, request, async (projectId, filters, jira, jiraProjectId) => {
+      if (!jira.issues) throw new OverviewFailure('UNAVAILABLE');
+      const overview = await dependencies.readOverview({
+        projectId, filters, jiraIssues: jira.issues, jiraState: jira.state, observedAt: dependencies.now().toISOString(),
+      });
+      if (!overview?.snapshot || overview.asOf !== overview.snapshot.asOf) throw new OverviewFailure('NOT_READY');
+      const alert = await dependencies.readAlert({ projectId, filters: { asOf: overview.snapshot.asOf }, jiraIssues: jira.issues });
+      if (!alert) throw new OverviewFailure('FORBIDDEN');
+      const { project, snapshot, sources } = overview;
+      return {
+        data: { project: { ...project, jiraProjectId }, snapshot, sources, alert },
+        sources: sources.map(({ source, state }) => ({ source, state })),
+      };
     }),
   };
 }

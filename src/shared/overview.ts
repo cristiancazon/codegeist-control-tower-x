@@ -36,7 +36,7 @@ export type OverviewAlert = {
 };
 
 export type Overview = {
-  project: { name: string; key: string; currency: string };
+  project: { name: string; key: string; currency: string; jiraProjectId?: string };
   asOf: string | null;
   snapshot: { asOf: string; collectedAt: string } | null;
   phases: Array<{ code: string; name: string }>;

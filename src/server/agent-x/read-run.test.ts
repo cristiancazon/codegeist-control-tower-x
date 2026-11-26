@@ -48,12 +48,12 @@ test('missing, anonymous or inconsistent Forge Rovo identity cannot reach the re
 
 test('malformed selectors are rejected before the read and never echoed', async () => {
   const action = createReadFuturosResult(async () => { throw new Error('The read must not run.'); });
-  for (const payload of [{ ...selectors, runId: 'injected-instruction' }, { ...selectors, jiraProjectId: 'PED' },
+  for (const payload of [{ ...selectors, runId: 'injected-instruction' }, { ...selectors, jiraProjectId: 'UNKNOWN_PROJECT' },
     { ...selectors, jiraProjectId: 10202 }, { runId }]) {
     const output = await action(payload, context);
     assert.ok(!output.ok);
     if (!output.ok) assert.equal(output.error.code, 'INVALID_REFERENCE');
-    assert.doesNotMatch(JSON.stringify(output), /injected-instruction|PED|10202/);
+    assert.doesNotMatch(JSON.stringify(output), /injected-instruction|UNKNOWN_PROJECT|10202/);
   }
 });
 

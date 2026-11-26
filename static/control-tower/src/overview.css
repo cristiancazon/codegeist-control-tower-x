@@ -32,7 +32,7 @@
   letter-spacing: -0.015em;
 }
 
-.ov-dashboard :where(button, select, input):focus-visible,
+.ov-dashboard :where(button, select, input, textarea):focus-visible,
 .ov-dashboard summary:focus-visible {
   outline: 2px solid var(--ov-focus);
   outline-offset: 3px;
@@ -328,6 +328,54 @@
 .ov-handoff > strong {
   align-self: center;
   font-size: 1.2rem;
+}
+
+.ov-agent-handoff {
+  min-inline-size: 0;
+  padding-block-start: 0.65rem;
+  border-block-start: 1px solid var(--ov-border);
+}
+
+.ov-agent-handoff > summary {
+  inline-size: fit-content;
+  color: var(--ov-accent);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.ov-agent-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.45rem;
+  margin-block-start: 0.55rem;
+}
+
+.ov-agent-body label {
+  color: var(--ov-muted);
+  font-size: 0.825rem;
+  font-weight: 600;
+}
+
+.ov-agent-body textarea {
+  inline-size: min(100%, 42rem);
+  min-block-size: 4.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--ds-border-input, #758995);
+  border-radius: 0.3rem;
+  color: var(--ov-text);
+  background: var(--ds-background-input, var(--ov-surface));
+  font: inherit;
+  resize: vertical;
+}
+
+.ov-agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ov-agent-status:not(:empty) {
+  margin-block-start: 0.45rem;
 }
 
 .ov-metrics {

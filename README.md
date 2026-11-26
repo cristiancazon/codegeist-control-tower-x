@@ -60,6 +60,10 @@ Abrí **Control Tower X** en PED con una cuenta que pueda administrar el proyect
 
 Con el snapshot de demo publicado y el rol `PLANNER` en PED, abrí **Futuros**. Fijá la cantidad de muestras y la semilla compartida, iniciá S0, S1 y S2, y actualizá las corridas activas hasta que publiquen. La comparación usa resultados del mismo snapshot y semilla. Si una corrida propia venció, el reintento conserva sus parámetros y el historial. [Resultados de Jira development](specs/005-futuros-engine/tests.md#resultados-en-jira-development-del-26-de-noviembre-de-2026).
 
+### Consultar a Agent X en Jira
+
+En **Vista general** de PED, abrí la cadena de impacto de A-17 y elegí **Consultar a Agent X**. Rovo recibe la referencia del proyecto y consulta las evidencias con la cuenta activa. La consulta también queda disponible para copiar. Desde **Futuros**, podés abrir Agent X con la referencia exacta de una corrida publicada o pedir una comparación con los UUID de S0, S1 y S2. Las respuestas identifican el corte y el origen de las observaciones. [Pruebas en Jira development](specs/007-agent-x/tests.md).
+
 ## Benchmark de Futuros en Forge staging
 
 Usá el sitio Jira demo autorizado y el proyecto PED con los 120 ítems sintéticos del fixture ya cargados. Configurá los identificadores del mismo destino en `staging`. Forge guarda los datos de la app de cada entorno en su propia instalación. [Entornos y variables de Forge](https://developer.atlassian.com/platform/forge/environments-and-versions/) · [Instalación en sitio demo](https://developer.atlassian.com/platform/forge/provision-a-demo-development-site/).

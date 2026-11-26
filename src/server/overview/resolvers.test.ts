@@ -61,7 +61,8 @@ function harness(overrides: Partial<Parameters<typeof createOverviewResolvers>[0
 test('reads current Jira scope with a single verified app Viewer role', async () => {
   const { calls, entries, resolvers } = harness();
   const result = await resolvers.get({ context, payload: { asOf: '2026-11-24', phaseCode: 'PH-01' } });
-  assert.equal(result.ok, true);
+  assert.ok(result.ok);
+  assert.equal(result.data.project.jiraProjectId, '10202');
   assert.deepEqual(calls, ['context', 'jira-permission', 'app-role', 'jira-page', 'overview-data']);
   assert.match(JSON.stringify(entries), new RegExp(result.requestId));
   assert.doesNotMatch(JSON.stringify(entries), /actor-viewer|10202|Título privado|project-on-server/);
@@ -71,6 +72,7 @@ test('rejects spoofed selectors, an invalid alert and impossible dates before an
   const { calls, resolvers } = harness();
   for (const result of [
     await resolvers.get({ context, payload: { projectId: '10203' } }),
+    await resolvers.get({ context, payload: { jiraProjectId: '10203' } }),
     await resolvers.get({ context, payload: { actorAccountId: 'another-actor' } }),
     await resolvers.get({ context, payload: { asOf: '2026-02-31' } }),
     await resolvers.alert({ context, payload: { code: 'A-18' } }),
