@@ -2,6 +2,8 @@ import api, { NeedsAuthenticationError, route } from '@forge/api';
 import Resolver from '@forge/resolver';
 import { createHealthResolver } from './server/health';
 import { HEALTH_OPERATION } from './shared/health';
+import { INTEGRATIONS_GET } from './shared/integrations';
+import { forgeIntegrationsResolver } from './server/integrations/forge';
 import { DEMO_APPLY, DEMO_PREVIEW } from './shared/demo';
 import { applyDemo, previewDemo } from './server/data/bootstrap/resolvers';
 import { overviewResolvers } from './server/overview/resolvers';
@@ -25,6 +27,7 @@ const resolveHealth = createHealthResolver({
 
 const resolver = new Resolver();
 resolver.define(HEALTH_OPERATION, resolveHealth);
+resolver.define(INTEGRATIONS_GET, forgeIntegrationsResolver(resolveHealth));
 resolver.define(DEMO_PREVIEW, previewDemo);
 resolver.define(DEMO_APPLY, applyDemo);
 resolver.define(OVERVIEW_GET, overviewResolvers.get);

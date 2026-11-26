@@ -64,6 +64,10 @@ Con el snapshot de demo publicado y el rol `PLANNER` en PED, abrí **Futuros**. 
 
 En **Vista general** de PED, abrí la cadena de impacto de A-17 y elegí **Consultar a Agent X**. Rovo recibe la referencia del proyecto y consulta las evidencias con la cuenta activa. La consulta también queda disponible para copiar. Desde **Futuros**, podés abrir Agent X con la referencia exacta de una corrida publicada o pedir una comparación con los UUID de S0, S1 y S2. Las respuestas identifican el corte y el origen de las observaciones. [Pruebas en Jira development](specs/007-agent-x/tests.md).
 
+### Consultar las integraciones
+
+Abrí **Estado de la instalación → Integraciones del proyecto**. Jira indica si se confirmó `Browse Projects` y Rovo indica la disponibilidad comunicada por la sesión anfitriona. **Actualizar integraciones** vuelve a comprobar los accesos de la cuenta activa. Cada fuente opcional informa su estado y el recorrido alternativo. [Configuración opcional](specs/008-rovo-integrations/plan.md#perfil-base-y-condiciones-para-un-perfil-opcional) · [Evidencia](specs/008-rovo-integrations/tests.md).
+
 ## Benchmark de Futuros en Forge staging
 
 Usá el sitio Jira demo autorizado y el proyecto PED con los 120 ítems sintéticos del fixture ya cargados. Configurá los identificadores del mismo destino en `staging`. Forge guarda los datos de la app de cada entorno en su propia instalación. [Entornos y variables de Forge](https://developer.atlassian.com/platform/forge/environments-and-versions/) · [Instalación en sitio demo](https://developer.atlassian.com/platform/forge/provision-a-demo-development-site/).

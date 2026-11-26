@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
 import { DemoBootstrap } from './demo-bootstrap';
+import { IntegrationsPanel } from './integrations-panel';
 import { OverviewDashboard } from './overview';
 import { OperationsDashboard } from './operations';
 import { FuturosRunner } from './futuros-runner';
@@ -92,7 +93,7 @@ function ForgeConnection() {
         </div>
         {retryable && <button type="button" onClick={retry}>Reintentar</button>}
       </section>
-      {response?.ok && response.data.status === 'READY' && <DemoBootstrap />}
+      {response?.ok && response.data.status === 'READY' && <><IntegrationsPanel /><DemoBootstrap /></>}
     </>
   );
 }
