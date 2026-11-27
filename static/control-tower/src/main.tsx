@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
 import { DemoBootstrap } from './demo-bootstrap';
+import { DecisionsDashboard } from './decisions';
 import { IntegrationsPanel } from './integrations-panel';
 import { OverviewDashboard } from './overview';
 import { OperationsDashboard } from './operations';
@@ -138,11 +139,17 @@ function App() {
           onClick={() => openOperations()}>Explorar proyecto</button>
         <button type="button" aria-current={route.view === 'futuros' ? 'page' : undefined}
           onClick={() => navigate({ view: 'futuros' })}>Futuros</button>
+        <button type="button" aria-current={route.view === 'decisions' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'decisions' })}>Decisiones</button>
       </nav>
       {route.view === 'overview' && <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />}
       {route.view === 'operations' && <OperationsDashboard initialTarget={target} />}
       {route.view === 'futuros' && <FuturosRunner focusedRunId={route.runId}
-        onFocusRun={(runId) => navigate({ view: 'futuros', runId })} />}
+        onFocusRun={(runId) => navigate({ view: 'futuros', runId })}
+        onPrepareDecision={(runId) => navigate({ view: 'decisions', runId })} />}
+      {route.view === 'decisions' && <DecisionsDashboard decisionId={route.decisionId} runId={route.runId}
+        onOpen={(decisionId) => navigate({ view: 'decisions', decisionId })} onBack={() => navigate({ view: 'decisions' })}
+        onOpenRun={(runId) => navigate({ view: 'futuros', runId })} />}
       <details className="installation-tools" onToggle={(event) => {
         if (event.currentTarget.open) {
           setHasOpenedTools(true);

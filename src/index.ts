@@ -3,6 +3,8 @@ import Resolver from '@forge/resolver';
 import { createHealthResolver } from './server/health';
 import { HEALTH_OPERATION } from './shared/health';
 import { INTEGRATIONS_GET } from './shared/integrations';
+import { activateDemoApprover, decisionsResolvers } from './server/decisions/forge';
+import { DECISIONS_ACTIVATE_APPROVER } from './shared/decisions';
 import { forgeIntegrationsResolver } from './server/integrations/forge';
 import { DEMO_APPLY, DEMO_PREVIEW } from './shared/demo';
 import { applyDemo, previewDemo } from './server/data/bootstrap/resolvers';
@@ -42,5 +44,7 @@ resolver.define(FUTUROS_RUN, getRun);
 resolver.define(FUTUROS_CANCEL, cancelRun);
 resolver.define(FUTUROS_COMPARE, compareRuns);
 resolver.define(FUTUROS_GRANT, grantDemoPlanner);
+for (const [operation, resolve] of Object.entries(decisionsResolvers)) resolver.define(operation, resolve);
+resolver.define(DECISIONS_ACTIVATE_APPROVER, activateDemoApprover);
 
 export const handler = resolver.getDefinitions();

@@ -1,10 +1,12 @@
 import { NeedsAuthenticationError, route, type Route } from '@forge/api';
 import { performance } from 'node:perf_hooks';
+import { assertCorrectiveInput, correctiveDescription, correctiveFields, keyBelongsToProject, matchesCorrectiveFields,
+  matchesCorrectiveMarker } from './correctives';
 import {
   isDateOnly, isFixtureMarker, isIssueKey, isJiraId, isRecord, isText, normalizeWorkItem, readIssueIdentity,
 } from './normalize';
 import {
-  BOOTSTRAP_PERMISSIONS, JiraBoundaryError, type JiraFixtureTaskInput, type JiraIssueIdentity, type JiraPermission,
+  BOOTSTRAP_PERMISSIONS, JiraBoundaryError, type JiraCorrectiveIssueInput, type JiraFixtureTaskInput, type JiraIssueIdentity, type JiraPermission,
   type JiraProjectIdentity, type JiraRequest, type JiraSearchOptions, type JiraTaskCreateMetadata,
   type JiraWorkItem, type JiraWorkItemPage,
 } from './types';
@@ -36,8 +38,8 @@ function standardFailure(status: number, retryAfterSeconds?: number): JiraBounda
   }
 }
 
-function reconciliationFailure(status?: number): JiraBoundaryError {
-  return new JiraBoundaryError('RECONCILIATION_REQUIRED', 'Jira no confirmó el resultado de la creación. Requiere conciliación.', { status });
+function reconciliationFailure(status?: number, retryAfterSeconds?: number): JiraBoundaryError {
+  return new JiraBoundaryError('RECONCILIATION_REQUIRED', 'Jira no confirmó el resultado de la creación. Requiere conciliación.', { status, retryAfterSeconds });
 }
 
 function retryAfterSeconds(value: string | null | undefined): number | undefined {
@@ -47,8 +49,9 @@ function retryAfterSeconds(value: string | null | undefined): number | undefined
   return undefined;
 }
 
-function isDefinitePostRejection(status: number): boolean {
-  return status === 400 || status === 401 || status === 403 || status === 404 || status === 422 || status === 429;
+function isDefinitePostRejection(status: number, create: 'fixture' | 'corrective'): boolean {
+  return status === 400 || status === 401 || status === 403 || status === 422 ||
+    (create === 'fixture' && (status === 404 || status === 429));
 }
 
 function readTaskTypeId(issueTypes: unknown[]): string {
@@ -74,7 +77,7 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
   const deadline = performance.now() + budgetMs;
   let browseConfirmed = false;
 
-  async function requestJson(path: Route, options: { body?: unknown; create?: boolean } = {}): Promise<unknown> {
+  async function requestJson(path: Route, options: { body?: unknown; create?: 'fixture' | 'corrective' } = {}): Promise<unknown> {
     const requestBudget = Math.min(REQUEST_TIMEOUT_MS, Math.floor(deadline - performance.now()));
     if (requestBudget <= 0) {
       throw new JiraBoundaryError('SOURCE_UNAVAILABLE', 'La verificación Jira excedió el tiempo de esta invocación.');
@@ -101,7 +104,7 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
           ...(body === undefined ? {} : { body }),
         });
       } catch (error) {
-        if (error instanceof NeedsAuthenticationError) {
+        if (error instanceof NeedsAuthenticationError && options.create !== 'corrective') {
           // Forge uses this exception to prompt for user consent.
           throw error;
         }
@@ -114,8 +117,8 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
       }
 
       if (response.status !== (options.create ? 201 : 200)) {
-        if (options.create && !isDefinitePostRejection(response.status)) {
-          throw reconciliationFailure(response.status);
+        if (options.create && !isDefinitePostRejection(response.status, options.create)) {
+          throw reconciliationFailure(response.status, retryAfterSeconds(response.headers?.get('Retry-After')));
         }
         throw standardFailure(response.status, retryAfterSeconds(response.headers?.get('Retry-After')));
       }
@@ -338,7 +341,7 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
       })),
     };
     const body = await requestJson(route`/rest/api/3/issue`, {
-      create: true,
+      create: 'fixture',
       body: { fields: {
         project: { id: projectId },
         issuetype: { id: input.issueTypeId },
@@ -355,10 +358,68 @@ export function createJiraProjectAdapter(projectId: string, request: JiraRequest
     return identity;
   }
 
+  async function assertCorrectiveCreateTarget(issueTypeId: string) {
+    if (!isJiraId(issueTypeId)) throw new JiraBoundaryError('VALIDATION_ERROR', 'El tipo del correctivo Jira no es válido.');
+    const permissions = await checkPermissions(['BROWSE_PROJECTS', 'CREATE_ISSUES']);
+    if (permissions.BROWSE_PROJECTS !== true || permissions.CREATE_ISSUES !== true) {
+      browseConfirmed = false;
+      throw new JiraBoundaryError('FORBIDDEN', 'La cuenta carece de permisos Jira para crear el correctivo.');
+    }
+    browseConfirmed = true;
+    const [metadata, project] = await Promise.all([getTaskCreateMetadata(), getProject()]);
+    if (metadata.issueTypeId !== issueTypeId || metadata.requiresDueDate || !isIssueKey(`${project.key}-1`)) {
+      throw new JiraBoundaryError('CONFLICT', 'El destino Jira no admite los campos aprobados del correctivo.');
+    }
+    return project;
+  }
+
+  async function createCorrectiveIssue(input: JiraCorrectiveIssueInput): Promise<JiraIssueIdentity> {
+    assertCorrectiveInput(input);
+    const { key: projectKey } = await assertCorrectiveCreateTarget(input.issueTypeId);
+    if (projectKey !== input.projectKey) throw new JiraBoundaryError('CONFLICT', 'El destino Jira cambió después de la aprobación.');
+    const body = await requestJson(route`/rest/api/3/issue`, {
+      create: 'corrective',
+      body: { fields: {
+        project: { id: projectId }, issuetype: { id: input.issueTypeId }, summary: input.summary,
+        description: correctiveDescription(input.description), labels: [input.marker],
+      } },
+    });
+    const identity = readIssueIdentity(body);
+    if (!identity || !keyBelongsToProject(identity.key, projectKey)) throw reconciliationFailure(201);
+    return identity;
+  }
+
+  async function findCorrectiveByMarker(input: JiraCorrectiveIssueInput): Promise<JiraIssueIdentity | undefined> {
+    assertCorrectiveInput(input);
+    const permissions = await checkPermissions(['BROWSE_PROJECTS']);
+    if (permissions.BROWSE_PROJECTS !== true) throw new JiraBoundaryError('FORBIDDEN', 'La cuenta no puede consultar el proyecto Jira.');
+    const parameters = new URLSearchParams({
+      jql: `project = ${projectId} AND labels = "${input.marker}" ORDER BY id ASC`, fields: 'project,labels', maxResults: '2',
+    });
+    const search = await requestJson(route`/rest/api/3/search/jql?${parameters}`);
+    if (!isRecord(search) || search.isLast !== true || !Array.isArray(search.issues) || search.issues.length !== 1 ||
+      search.nextPageToken != null) return undefined;
+    const candidate = search.issues[0];
+    const found = readIssueIdentity(candidate);
+    if (!found || !matchesCorrectiveMarker(candidate, projectId, input.marker)) return undefined;
+    const fields = new URLSearchParams({ fields: correctiveFields });
+    let live: unknown;
+    try {
+      live = await requestJson(route`/rest/api/3/issue/${found.id}?${fields}`);
+    } catch (error) {
+      if (error instanceof JiraBoundaryError && error.code === 'FORBIDDEN') return undefined;
+      throw error;
+    }
+    const confirmed = readIssueIdentity(live);
+    return confirmed?.id === found.id && confirmed.key === found.key && matchesCorrectiveFields(live, projectId, found.key, input)
+      ? confirmed : undefined;
+  }
+
   return {
     projectId, checkPermissions, assertBrowsePermission: requireBrowsePermission, assertBootstrapPermissions,
     getProject, getProjectWithTaskType, getTaskCreateMetadata, searchWorkItems,
     searchWorkItemsGet: (options: JiraSearchOptions) => searchWorkItems(options, 'GET'), getWorkItem, createFixtureTask,
+    assertCorrectiveCreateTarget, createCorrectiveIssue, findCorrectiveByMarker,
   };
 }
 

@@ -72,7 +72,7 @@ function isDemoConfiguration(projectId: string, jiraProjectId: string) {
     isConfiguredStagingAdoption(runtime, jiraProjectId, { ...config, enabled: process.env.CTX_STAGING_ADOPT_FIXTURE });
 }
 
-async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 'configure') {
+async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 'configure' | 'decisions') {
   const actor = readDemoActor(context);
   if (!actor) throw new FuturosError('AUTH_REQUIRED');
   const jira = createForgeJiraProjectAdapter(context);
@@ -84,6 +84,7 @@ async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 
   const mayConfigure = (mode === 'configure' || mode === 'catalog') && access.roles.includes('ADMIN') &&
     isDemoConfiguration(access.projectId, jira.projectId);
   if ((mode === 'start' && !canStart) || (mode === 'read' && !mayRead) ||
+      (mode === 'decisions' && !mayRead && !access.roles.includes('APPROVER')) ||
       (mode === 'configure' && !mayConfigure) || (mode === 'catalog' && !mayRead && !mayConfigure)) {
     throw new FuturosError('FORBIDDEN');
   }
@@ -101,7 +102,7 @@ async function authorize(context: unknown, mode: 'read' | 'start' | 'catalog' | 
     return coverage.issues;
   });
   if (!await confirmFuturosVisibility(access.projectId, jira.projectId, active)) throw new FuturosError('FORBIDDEN');
-  return { actor, jiraProjectId: jira.projectId, projectId: access.projectId, canStart, mayRead, mayConfigure };
+  return { actor, jira, jiraProjectId: jira.projectId, projectId: access.projectId, roles: access.roles, canStart, mayRead, mayConfigure };
 }
 
 async function protect<T>(operation: Operation, apply: () => Promise<T>): Promise<FuturosResponse<T>> {
@@ -189,6 +190,11 @@ async function getVisibleRun(projectId: string, runId: string) {
   if (!snapshots.length) throw new FuturosError('STALE_INPUT');
   return run;
 }
+
+export const authorizeDecisionEvidence = (context: unknown) => authorize(context, 'decisions');
+
+// Server-only. The Decisions resolver establishes the current source ACL before reading an aggregate.
+export const readDecisionRun = async (projectId: string, runId: string) => runView(await getVisibleRun(projectId, runId));
 
 async function dispatchIfQueued(run: RunRecord) {
   if (run.status === 'QUEUED') {

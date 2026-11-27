@@ -69,3 +69,11 @@ export type JiraFixtureTaskInput = {
   description: string;
   dueDate?: string;
 };
+
+export type JiraCorrectiveIssueInput = {
+  issueTypeId: string;
+  projectKey: string;
+  marker: string;
+  summary: string;
+  description: string;
+};

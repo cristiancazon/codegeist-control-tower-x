@@ -13,6 +13,7 @@
 | ADR-009 | Aplicada en development | Publicar revisiones inmutables de A-17 con validación de la revisión de origen y acceso vigente. Usar referencias de corrida para navegar y consultar Agent X | SDD-006 / AC006-01 a AC006-04 |
 | ADR-010 | Aplicada en development | Exponer a Agent X cinco acciones de lectura con identidad de Forge, comprobación de acceso vigente y proyección explícita de procedencia | SDD-007 / AC007-01 a AC007-04 |
 | ADR-011 | Aplicada en development | Observar capacidades de la instalación con la cuenta activa y exigir opt-in por fuente | SDD-008 / AC008-01 a AC008-04 |
+| ADR-012 | Implementada | Congelar la propuesta y reservar la creación de Jira tras una aprobación por una cuenta distinta | SDD-009 / AC009-01 a AC009-04 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 
@@ -45,3 +46,7 @@ Agent X toma la identidad del contexto de invocación de Forge. El ID del proyec
 ### ADR-011 · Observación de integraciones por cuenta
 
 El 26 de noviembre de 2026 se incorporó una matriz de integración al perfil Jira. Se eligió verificar de nuevo al consultar, porque el acceso de una persona puede cambiar entre sesiones. JSM, Assets y Confluence requieren configuración del servidor vinculada al sitio y al proyecto, consentimiento y ACL de la fuente. Se evaluó instalar todas las fuentes en el perfil base. Se mantuvieron los permisos del perfil Jira y los recorridos sintéticos ante indisponibilidad. La conexión opcional de Confluence requiere una revisión de migración separada. Las opciones Preview se revisan cuando existe un entorno autorizado y evidencia reproducible. [Diseño y fuentes oficiales](../../specs/008-rovo-integrations/plan.md#perfil-base-y-condiciones-para-un-perfil-opcional) · [Evidencia](../../specs/008-rovo-integrations/tests.md).
+
+### ADR-012 · Propuesta versionada y conciliación Jira
+
+El 27 de noviembre de 2026 se eligió un registro inmutable de propuesta con revisión y SHA-256. La aprobación conserva el motivo y la cuenta revisora. La reserva SQL exige la cuenta proponente, la revisión aprobada, vigencia y roles activos. Se evaluó reintentar automáticamente tras un timeout. Se adoptó la conciliación explícita porque la búsqueda de Jira puede tardar en reflejar una creación y una respuesta perdida deja incierto el resultado. El perfil admite una propuesta nueva cuando cambia el texto. Revisar concurrencia y recuperación antes de cambiar el destino o ampliar el perfil de distribución. [Diseño y fuentes oficiales](../../specs/009-decisions/plan.md#perfil-de-demostración) · [Casos de prueba](../../specs/009-decisions/tests.md).

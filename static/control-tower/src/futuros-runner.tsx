@@ -39,7 +39,7 @@ const dateTime = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyl
 const defaultSeed = '00000000000000000000000020261125';
 
 type Failure = Extract<FuturosResponse<unknown>, { ok: false }>['error'];
-type Props = { focusedRunId?: string; onFocusRun: (runId: string) => void };
+type Props = { focusedRunId?: string; onFocusRun: (runId: string) => void; onPrepareDecision: (runId: string) => void };
 
 async function openAgent(prompt: string) {
   if (!await rovo.isEnabled()) throw new Error('Rovo no está habilitado en este sitio.');
@@ -75,7 +75,7 @@ function RunState({ run, detail, focused }: { run: FuturosRunCard; detail?: Futu
   );
 }
 
-export function FuturosRunner({ focusedRunId, onFocusRun }: Props) {
+export function FuturosRunner({ focusedRunId, onFocusRun, onPrepareDecision }: Props) {
   const [catalog, setCatalog] = useState<FuturosCatalog>();
   const [runs, setRuns] = useState<Record<string, FuturosRun>>({});
   const [unavailableRuns, setUnavailableRuns] = useState<string[]>([]);
@@ -429,6 +429,8 @@ export function FuturosRunner({ focusedRunId, onFocusRun }: Props) {
         {detail && <>
           <p>{runName(detail)} · {statuses[detail.status]}</p>
           <div className="demo-actions">
+            {catalog.canStart && detail.status === 'SUCCEEDED' && byScenario.get(detail.scenarioId)?.code === 'S2' &&
+              <button type="button" disabled={busy} onClick={() => onPrepareDecision(detail.id)}>Preparar propuesta</button>}
             {detail.canRetry && <button type="button" disabled={busy}
               onClick={() => void execute(() => retry(detail.id))}>Reintentar corrida</button>}
             {detail.canCancel && <button type="button" disabled={busy} onClick={() => void execute(async () => {

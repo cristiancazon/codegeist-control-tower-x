@@ -68,6 +68,10 @@ En **Vista general** de PED, abrí la cadena de impacto de A-17 y elegí **Consu
 
 Abrí **Estado de la instalación → Integraciones del proyecto**. Jira indica si se confirmó `Browse Projects` y Rovo indica la disponibilidad comunicada por la sesión anfitriona. **Actualizar integraciones** vuelve a comprobar los accesos de la cuenta activa. Cada fuente opcional informa su estado y el recorrido alternativo. [Configuración opcional](specs/008-rovo-integrations/plan.md#perfil-base-y-condiciones-para-un-perfil-opcional) · [Evidencia](specs/008-rovo-integrations/tests.md).
 
+### Proponer un correctivo en Jira development
+
+En **Futuros**, abrí una corrida publicada de S2 con una cuenta `PLANNER` y elegí **Preparar propuesta**. Revisá texto, evidencia y destino. En **Decisiones**, otra cuenta con `APPROVER` y acceso a la evidencia registra una aprobación o un rechazo. El proponente confirma la creación en Jira en un paso separado. Si se pierde la respuesta, **Buscar incidencia en Jira** intenta confirmar el correctivo por su marcador antes de cerrar la propuesta. [Preparar el ensayo](specs/009-decisions/plan.md#perfil-de-demostración) · [Pruebas](specs/009-decisions/tests.md).
+
 ## Benchmark de Futuros en Forge staging
 
 Usá el sitio Jira demo autorizado y el proyecto PED con los 120 ítems sintéticos del fixture ya cargados. Configurá los identificadores del mismo destino en `staging`. Forge guarda los datos de la app de cada entorno en su propia instalación. [Entornos y variables de Forge](https://developer.atlassian.com/platform/forge/environments-and-versions/) · [Instalación en sitio demo](https://developer.atlassian.com/platform/forge/provision-a-demo-development-site/).
