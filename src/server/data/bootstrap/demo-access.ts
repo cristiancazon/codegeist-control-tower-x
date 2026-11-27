@@ -28,6 +28,13 @@ export function isConfiguredDemoProject(runtime: RuntimeContext, jiraProjectId: 
   return runtime.environmentType === 'DEVELOPMENT' && matchesDemoTarget(runtime, jiraProjectId, config);
 }
 
+export function isConfiguredEvaluationProject(
+  runtime: RuntimeContext, jiraProjectId: string, config: DemoTarget & { enabled?: string },
+): boolean {
+  return (runtime.environmentType === 'STAGING' || runtime.environmentType === 'PRODUCTION') &&
+    config.enabled === 'true' && matchesDemoTarget(runtime, jiraProjectId, config);
+}
+
 export function isConfiguredStagingAdoption(
   runtime: RuntimeContext, jiraProjectId: string, config: DemoTarget & { enabled?: string },
 ): boolean {

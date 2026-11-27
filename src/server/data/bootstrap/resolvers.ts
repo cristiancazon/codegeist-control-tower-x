@@ -9,7 +9,7 @@ import {
 import { enqueue as enqueueSchema } from '../migration-events';
 import { isSchemaReady } from '../sql/migrations';
 import { readExistingFixture } from './adoption';
-import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
+import { isConfiguredDemoProject, isConfiguredEvaluationProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
 import { demoProjectKey, fixture, fixtureHash } from './fixture';
 import { enqueueFixturePublish } from './publish';
 import { advanceFixtureReconciliation } from './reconciliation';
@@ -48,7 +48,10 @@ async function authorize(context: unknown) {
   const adopt = isConfiguredStagingAdoption(runtime, jira.projectId, {
     ...config, enabled: process.env.CTX_STAGING_ADOPT_FIXTURE,
   });
-  if (!adopt && !isConfiguredDemoProject(runtime, jira.projectId, config)) {
+  const evaluation = isConfiguredEvaluationProject(runtime, jira.projectId, {
+    ...config, enabled: process.env.CTX_EVALUATION_DEMO_ENABLED,
+  });
+  if (!adopt && !evaluation && !isConfiguredDemoProject(runtime, jira.projectId, config)) {
     throw new DemoError('FORBIDDEN', 'La carga solo está habilitada para PED en el sitio Jira de demostración.');
   }
   if (adopt) {

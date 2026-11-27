@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
+import { isConfiguredDemoProject, isConfiguredEvaluationProject, isConfiguredStagingAdoption, readDemoActor } from './demo-access';
 
 test('demo resolves the trusted Atlassian actor, including lowercase s, p and c', () => {
   assert.equal(readDemoActor({ accountId: '557058:site-person-c' }), '557058:site-person-c');
@@ -47,4 +47,18 @@ test('staging adoption requires the explicit flag and exact Jira installation an
   assert.equal(isConfiguredStagingAdoption({
     ...runtime, installation: { contexts: [{ toString: () => 'ari:cloud:confluence::site/demo-cloud', cloudId: 'demo-cloud' }] },
   }, '10202', config), false);
+});
+test('evaluation opt-in is restricted to the configured Jira installation and project', () => {
+  const cloudId = 'evaluation-cloud';
+  const config = { cloudId, jiraProjectId: '10202', enabled: 'true' };
+  const installation = { contexts: [{ cloudId, toString: () => `ari:cloud:jira::site/${cloudId}` }] };
+  for (const environmentType of ['STAGING', 'PRODUCTION']) {
+    const runtime = { environmentType, installation };
+    assert.equal(isConfiguredEvaluationProject(runtime, '10202', config), true);
+    assert.equal(isConfiguredEvaluationProject(runtime, '10202', { ...config, enabled: undefined }), false);
+    assert.equal(isConfiguredEvaluationProject(runtime, '10203', config), false);
+    assert.equal(isConfiguredEvaluationProject(runtime, '10202', { ...config, cloudId: 'another-site' }), false);
+  }
+  assert.equal(isConfiguredEvaluationProject({ environmentType: 'DEVELOPMENT', installation }, '10202', config), false);
+  assert.equal(isConfiguredEvaluationProject({ environmentType: 'PRODUCTION' }, '10202', config), false);
 });

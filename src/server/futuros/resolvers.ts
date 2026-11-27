@@ -8,7 +8,7 @@ import {
   type FuturosCatalog, type FuturosComparison, type FuturosFailure, type FuturosResponse, type FuturosRun,
   type FuturosRunCard, type FuturosScenario,
 } from '../../shared/futuros';
-import { isConfiguredDemoProject, isConfiguredStagingAdoption, readDemoActor } from '../data/bootstrap/demo-access';
+import { isConfiguredDemoProject, isConfiguredEvaluationProject, isConfiguredStagingAdoption, readDemoActor } from '../data/bootstrap/demo-access';
 import { fixture } from '../data/bootstrap/fixture';
 import { createForgeJiraProjectAdapter, JiraBoundaryError } from '../data/jira';
 import { enqueue } from '../data/migration-events';
@@ -69,6 +69,7 @@ function isDemoConfiguration(projectId: string, jiraProjectId: string) {
   const runtime = getAppContext();
   const config = { cloudId: process.env.CTX_DEMO_CLOUD_ID, jiraProjectId: process.env.CTX_DEMO_JIRA_PROJECT_ID };
   return isConfiguredDemoProject(runtime, jiraProjectId, config) ||
+    isConfiguredEvaluationProject(runtime, jiraProjectId, { ...config, enabled: process.env.CTX_EVALUATION_DEMO_ENABLED }) ||
     isConfiguredStagingAdoption(runtime, jiraProjectId, { ...config, enabled: process.env.CTX_STAGING_ADOPT_FIXTURE });
 }
 

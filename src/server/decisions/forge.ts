@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getAppContext } from '@forge/api';
 import type { DecisionsResult } from '../../shared/decisions';
-import { isConfiguredDemoProject, readDemoActor } from '../data/bootstrap/demo-access';
+import { isConfiguredDemoProject, isConfiguredEvaluationProject, readDemoActor } from '../data/bootstrap/demo-access';
 import { demoProjectKey, fixture } from '../data/bootstrap/fixture';
 import { createForgeJiraProjectAdapter } from '../data/jira';
 import { isDateOnly, isJiraId, isRecord } from '../data/jira/normalize';
@@ -24,9 +24,13 @@ function demoTarget(context: unknown) {
   const cloudId = process.env.CTX_DEMO_CLOUD_ID;
   const jiraProjectId = process.env.CTX_DEMO_JIRA_PROJECT_ID;
   const issueTypeId = process.env.CTX_DECISIONS_ISSUE_TYPE_ID;
-  if (!isRecord(context) || !isRecord(project) || !isJiraId(project.id) || !cloudId ||
-      context.installContext !== `ari:cloud:jira::site/${cloudId}` ||
-      !isConfiguredDemoProject(getAppContext(), project.id, { cloudId, jiraProjectId }) || !isJiraId(issueTypeId)) {
+  if (!isRecord(context) || !isRecord(project) || !isJiraId(project.id) || !cloudId || !isJiraId(issueTypeId) ||
+      context.installContext !== `ari:cloud:jira::site/${cloudId}`) {
+    throw new DecisionFailure('DISABLED');
+  }
+  const runtime = getAppContext();
+  if (!isConfiguredDemoProject(runtime, project.id, { cloudId, jiraProjectId }) &&
+      !isConfiguredEvaluationProject(runtime, project.id, { cloudId, jiraProjectId, enabled: process.env.CTX_EVALUATION_DEMO_ENABLED })) {
     throw new DecisionFailure('DISABLED');
   }
   return { actor, jiraProjectId: project.id, issueTypeId };
