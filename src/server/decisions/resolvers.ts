@@ -146,7 +146,7 @@ export function createDecisionResolvers(deps: Dependencies) {
     return { ...item, description: stored.description, evidence: stored.evidence, target: stored.target,
       revision: row.revision, hash: row.payload_hash, reviewedAt: row.reviewed_at, reviewReason: row.review_reason,
       expiresAt: row.expires_at, executionStartedAt: row.execution_started_at, appliedAt: row.applied_at, issueKey,
-      errorCode: row.last_error_code, activity,
+      attemptCount: row.attempt_count, errorCode: row.last_error_code, activity,
       canReview: item.status === 'PROPOSED' && !item.isMine && scope.roles.includes('APPROVER') && sameTarget(scope, stored),
       canExecute: isPlanner && sameTarget(scope, stored) && executability(row, item.status),
       canReconcile: isPlanner && item.status === 'RECONCILIATION_REQUIRED',
@@ -271,12 +271,17 @@ export function createDecisionResolvers(deps: Dependencies) {
     [DECISIONS_APPROVE]: applyReview(DECISIONS_APPROVE),
     [DECISIONS_REJECT]: applyReview(DECISIONS_REJECT),
     [DECISIONS_EXECUTE]: invoke(DECISIONS_EXECUTE, async (request) => {
-      const { scope, row, stored } = await confirm(request.context, parse(request.payload, referenceFields));
+      const fields = parse(request.payload, [...referenceFields, 'expectedAttempt']);
+      const { expectedAttempt } = fields;
+      if (typeof expectedAttempt !== 'number' || !Number.isSafeInteger(expectedAttempt) || expectedAttempt < 0) {
+        throw new DecisionFailure('INVALID_REQUEST');
+      }
+      const { scope, row, stored } = await confirm(request.context, fields);
       if (row.proposed_by !== scope.actor || !scope.roles.includes('PLANNER')) throw new DecisionFailure('FORBIDDEN');
-      if (!executability(row, statusOf(row, deps.now()))) throw new DecisionFailure('CONFLICT');
+      if (row.attempt_count !== expectedAttempt || !executability(row, statusOf(row, deps.now()))) throw new DecisionFailure('CONFLICT');
       await freshEvidence(scope, stored);
       const reservation = await store.reserveExecution({ projectId: scope.projectId, decisionId: row.id,
-        actor: scope.actor, revision: row.revision, payloadHash: row.payload_hash });
+        actor: scope.actor, revision: row.revision, payloadHash: row.payload_hash, expectedAttempt });
       if (!reservation?.execution_token) throw new DecisionFailure('CONFLICT');
       const attempt = { projectId: scope.projectId, decisionId: row.id, actor: scope.actor, token: reservation.execution_token };
 

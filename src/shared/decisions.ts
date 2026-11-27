@@ -53,6 +53,7 @@ export type Decision = DecisionDraft & DecisionCard & {
   reviewReason: string | null;
   expiresAt: string | null;
   executionStartedAt: string | null;
+  attemptCount: number;
   appliedAt: string | null;
   issueKey: string | null;
   errorCode: string | null;
@@ -63,6 +64,7 @@ export type Decision = DecisionDraft & DecisionCard & {
 };
 
 export type DecisionReference = { decisionId: string; expectedRevision: number; expectedHash: string; confirmed: true };
+export type DecisionExecution = DecisionReference & { expectedAttempt: number };
 export type DecisionReview = DecisionReference & { reason: string };
 export type DecisionProposal = {
   runId: string; summary: string; description: string; idempotencyKey: string;

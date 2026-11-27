@@ -10,10 +10,10 @@ Suggested category **Apps for Specialized Industries**. Suggested bonus **Best A
 
 ## Judge testing instructions
 
-1. Use the authorized installation link on the designated Jira test site. A site administrator installs Control Tower X. Open project **PED** and select **Control Tower X**. Confirm the fixture cut and Jira and Rovo availability in **Estado de la instalación**.
+1. Use the authorized installation link on the designated Jira test site. A site administrator installs Control Tower X. The operator configures the destination issue type and separate reviewer in `CTX_DECISIONS_ISSUE_TYPE_ID` and `CTX_DEMO_APPROVER_ACCOUNT_ID`. Open project **PED** and select **Control Tower X**. Confirm the fixture cut and Jira and Rovo availability in **Estado de la instalación**. [Evaluation profile setup](plan.md#perfil-de-evaluación)
 2. Open **Vista general** and expand **Demora del suministro A-17**. Follow the links through PED-48, PED-64 and PED-83. Check that equipment, contractor and shipment references appear in the impact chain.
 3. Open **Futuros** and compare S0, S1 and S2 from the same snapshot with the same seed and sample count. Inspect the cost and schedule metrics and their uncertainty. Use **Consultar a Agent X** to explain the evidence and open a cited result.
-4. As the planner, open the published S2 run and choose **Preparar propuesta**. Review the generated draft and submit it. Share the exact proposal link with the designated reviewer. The reviewer opens it in a separate Jira session, checks the revision, and records a reason with an approval.
+4. As the planner, open the published S2 run and choose **Preparar propuesta**. Review the generated draft and submit it. Share the exact proposal link with the designated reviewer. The reviewer opens it in a separate Jira session and selects **Activar revisión para mi cuenta** at first use. They check the revision and record a reason with an approval.
 5. Return to the proposal as the planner. Choose **Preparar creación en Jira** and confirm the creation. Open the verified Jira issue from the proposal and compare its summary, evidence and activity. A proposal awaiting a different reviewer displays its pending status.
 
 ## Demo recording plan

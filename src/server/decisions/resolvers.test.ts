@@ -22,7 +22,7 @@ const target = { projectKey: 'PED', issueTypeId: '10207' };
 const expiresAt = '2026-12-01T00:00:00.000Z';
 const issue = { id: '88000', key: 'PED-121' };
 
-function harness(post: 'ok' | 'lost' = 'ok') {
+function harness(post: 'ok' | 'lost' | 'fail-once' = 'ok') {
   const db = new DatabaseSync(':memory:');
   let now = Date.parse('2026-11-27T00:00:00.000Z');
   const sqlTime = (time: number) => new Date(time).toISOString().replace('T', ' ').slice(0, -1);
@@ -54,6 +54,7 @@ function harness(post: 'ok' | 'lost' = 'ok') {
   const store = createDecisionStore(query);
   let posts = 0;
   let reconciliationVisible = false;
+  let pauseEvidence: undefined | (() => Promise<void>);
   const resolvers = createDecisionResolvers({ store, now: () => now,
     async authorize(context) {
       if (typeof context !== 'string') throw new DecisionFailure('FORBIDDEN');
@@ -68,6 +69,7 @@ function harness(post: 'ok' | 'lost' = 'ok') {
           assert.match(input.description, /Hash de resultado:/);
           posts++;
           if (post === 'lost') throw new JiraBoundaryError('RECONCILIATION_REQUIRED', 'Respuesta perdida');
+          if (post === 'fail-once' && posts === 1) throw new JiraBoundaryError('FORBIDDEN', 'Jira rechazó la creación.');
           return issue;
         },
         findCorrectiveByMarker: async () => reconciliationVisible ? issue : undefined,
@@ -78,12 +80,26 @@ function harness(post: 'ok' | 'lost' = 'ok') {
     },
     async evidence(_scope, id) {
       if (id !== runId) throw new DecisionFailure('STALE_INPUT');
+      const pause = pauseEvidence;
+      pauseEvidence = undefined;
+      if (pause) await pause();
       return { expiresAt, data: { runId, snapshotId, scenario: 'S2', resultHash: 'a'.repeat(64), modelVersion: 'cpm-pert-v1',
         asOf: '2026-11-24', sourceIssueKey: 'PED-48', durationP80Days: 37, costP80Cents: '4521000000' } };
     },
   });
   const revokeReview = () => db.prepare("UPDATE ctx_project_role SET revoked_at = db_now() WHERE account_id = 'reviewer'").run();
-  return { resolvers, posts: () => posts, revokeReview, showIssue: () => { reconciliationVisible = true; },
+  function pauseNextEvidence() {
+    let resume = () => {};
+    const continuation = new Promise<void>((resolve) => { resume = resolve; });
+    const waiting = new Promise<void>((resolve) => {
+      pauseEvidence = () => {
+        resolve();
+        return continuation;
+      };
+    });
+    return { waiting, resume };
+  }
+  return { resolvers, posts: () => posts, revokeReview, pauseNextEvidence, showIssue: () => { reconciliationVisible = true; },
     advance: (ms: number) => { now += ms; }, close: () => db.close() };
 }
 
@@ -101,6 +117,7 @@ const proposal = { runId, summary: 'Mitigar A-17', description: 'Confirmar el su
   expectedResultHash: 'a'.repeat(64), expectedIssueTypeId: '10207', expectedProjectKey: 'PED' };
 
 const ref = ({ id, revision, hash }: Decision) => ({ decisionId: id, expectedRevision: revision, expectedHash: hash, confirmed: true });
+const execution = (decision: Decision) => ({ ...ref(decision), expectedAttempt: decision.attemptCount });
 
 test('CT009-01/02 guards preview revisions, idempotency and approval by a distinct account', async (t) => {
   const { resolvers: r, posts, close } = harness();
@@ -132,14 +149,50 @@ test('CT009-03 rechecks approval role and creates exactly once under concurrent 
     const r = setup.resolvers;
     const submitted = data(await r[DECISIONS_PROPOSE]({ context: 'planner', payload: proposal }));
     const pinned = ref(submitted);
-    data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: { ...pinned, reason: 'Aprobado para la demo.' } }));
-    assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'reviewer', payload: pinned })), 'FORBIDDEN');
+    const approved = data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: { ...pinned, reason: 'Aprobado para la demo.' } }));
+    assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'reviewer', payload: execution(approved) })), 'FORBIDDEN');
     if (setup === revoked) setup.revokeReview();
-    const results = await Promise.all([r[DECISIONS_EXECUTE]({ context: 'planner', payload: pinned }),
-      r[DECISIONS_EXECUTE]({ context: 'planner', payload: pinned })]);
+    const results = await Promise.all([r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) }),
+      r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) })]);
     assert.equal(setup.posts(), setup === active ? 1 : 0);
     assert.equal(results.filter((result) => result.ok && result.data.issueKey === 'PED-121').length, setup === active ? 1 : 0);
   }
+});
+
+test('CT009-03 a delayed duplicate cannot become an explicit retry after a definitive Jira rejection', async (t) => {
+  const { resolvers: r, posts, pauseNextEvidence, close } = harness('fail-once');
+  t.after(close);
+  const submitted = data(await r[DECISIONS_PROPOSE]({ context: 'planner', payload: proposal }));
+  const approved = data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: {
+    ...ref(submitted), reason: 'Aprobado para la demo.',
+  } }));
+  assert.equal(approved.attemptCount, 0);
+  for (const expectedAttempt of [undefined, -1, 0.5]) {
+    assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: { ...ref(approved), expectedAttempt } })), 'INVALID_REQUEST');
+  }
+
+  const pause = pauseNextEvidence();
+  const delayed = r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) });
+  await pause.waiting;
+  let failed: Decision;
+  try {
+    failed = data(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) }));
+    assert.equal(failed.status, 'FAILED');
+    assert.equal(failed.attemptCount, 1);
+  } finally {
+    pause.resume();
+  }
+  assert.equal(errorCode(await delayed), 'CONFLICT');
+  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) })), 'CONFLICT');
+  assert.equal(posts(), 1);
+
+  const applied = data(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(failed) }));
+  assert.equal(applied.status, 'APPLIED');
+  assert.equal(applied.attemptCount, 2);
+  assert.equal(applied.issueKey, issue.key);
+  assert.equal(posts(), 2);
+  assert.equal(applied.activity.filter(({ event }) => event === 'execution_reserved').length, 2);
+  assert.equal(applied.activity.filter(({ event }) => event === 'execution_failed').length, 1);
 });
 
 test('CT009-04 never repeats a POST when the response is lost and resolves through a visible matching issue', async (t) => {
@@ -147,11 +200,11 @@ test('CT009-04 never repeats a POST when the response is lost and resolves throu
   t.after(close);
   const proposed = data(await r[DECISIONS_PROPOSE]({ context: 'planner', payload: proposal }));
   const pinned = ref(proposed);
-  data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: { ...pinned, reason: 'Aprobado para la demo.' } }));
-  const uncertain = data(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: pinned }));
+  const approved = data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: { ...pinned, reason: 'Aprobado para la demo.' } }));
+  const uncertain = data(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(approved) }));
   assert.equal(uncertain.status, 'RECONCILIATION_REQUIRED');
   assert.equal(uncertain.canExecute, false);
-  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: pinned })), 'CONFLICT');
+  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(uncertain) })), 'CONFLICT');
   assert.equal(data(await r[DECISIONS_RECONCILE]({ context: 'planner', payload: pinned })).status, 'RECONCILIATION_REQUIRED');
   advance(36 * 60 * 60 * 1_000);
   showIssue();
@@ -167,12 +220,12 @@ test('CT009-02 rejection and elapsed approval are terminal for execution', async
   const first = data(await r[DECISIONS_PROPOSE]({ context: 'planner', payload: proposal }));
   const rejected = data(await r[DECISIONS_REJECT]({ context: 'reviewer', payload: { ...ref(first), reason: 'Revisar el plan.' } }));
   assert.equal(rejected.status, 'REJECTED');
-  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: ref(first) })), 'CONFLICT');
+  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(first) })), 'CONFLICT');
   const next = data(await r[DECISIONS_PROPOSE]({ context: 'planner', payload: { ...proposal, idempotencyKey: runId } }));
   data(await r[DECISIONS_APPROVE]({ context: 'reviewer', payload: { ...ref(next), reason: 'Revisado.' } }));
   advance(24 * 60 * 60 * 1_000 + 1);
   const expired = data(await r[DECISIONS_GET]({ context: 'planner', payload: { decisionId: next.id } }));
   assert.equal(expired.status, 'EXPIRED');
-  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: ref(next) })), 'CONFLICT');
+  assert.equal(errorCode(await r[DECISIONS_EXECUTE]({ context: 'planner', payload: execution(next) })), 'CONFLICT');
   assert.equal(posts(), 0);
 });

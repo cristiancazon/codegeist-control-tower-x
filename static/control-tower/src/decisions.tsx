@@ -3,8 +3,8 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 import {
   DECISIONS_ACTIVATE_APPROVER, DECISIONS_APPROVE, DECISIONS_EXECUTE, DECISIONS_GET, DECISIONS_LIST, DECISIONS_PREPARE,
   DECISIONS_PROPOSE, DECISIONS_RECONCILE, DECISIONS_REJECT,
-  type Decision, type DecisionActivity, type DecisionCard, type DecisionDraft, type DecisionEvidence, type DecisionProposal,
-  type DecisionReference, type DecisionReview, type DecisionStatus, type DecisionsResult,
+  type Decision, type DecisionActivity, type DecisionCard, type DecisionDraft, type DecisionEvidence, type DecisionExecution,
+  type DecisionProposal, type DecisionReference, type DecisionReview, type DecisionStatus, type DecisionsResult,
 } from '../../../src/shared/decisions';
 import './decisions.css';
 
@@ -15,7 +15,7 @@ const invoke = makeInvoke<{
   [DECISIONS_PROPOSE]: (input: DecisionProposal) => DecisionsResult<Decision>;
   [DECISIONS_APPROVE]: (input: DecisionReview) => DecisionsResult<Decision>;
   [DECISIONS_REJECT]: (input: DecisionReview) => DecisionsResult<Decision>;
-  [DECISIONS_EXECUTE]: (input: DecisionReference) => DecisionsResult<Decision>;
+  [DECISIONS_EXECUTE]: (input: DecisionExecution) => DecisionsResult<Decision>;
   [DECISIONS_RECONCILE]: (input: DecisionReference) => DecisionsResult<Decision>;
   [DECISIONS_ACTIVATE_APPROVER]: (input: { confirmed: true }) => DecisionsResult<{ granted: true }>;
 }>();
@@ -99,6 +99,39 @@ function Problem({ failure, retry }: { failure: Failure; retry?: () => void }) {
   </div>;
 }
 
+function DecisionReadProblem({ failure, refresh }: { failure: Failure; refresh: () => void }) {
+  const [activating, setActivating] = useState(false);
+  const [activationFailure, setActivationFailure] = useState<Failure>();
+  const lock = useRef(false);
+
+  async function activate() {
+    if (lock.current) return;
+    lock.current = true;
+    setActivating(true);
+    setActivationFailure(undefined);
+    try {
+      const result = await invoke(DECISIONS_ACTIVATE_APPROVER, { confirmed: true });
+      if (result?.ok) refresh();
+      else setActivationFailure(result ? failureOf(result) : unavailable);
+    } catch {
+      setActivationFailure(unavailable);
+    } finally {
+      lock.current = false;
+      setActivating(false);
+    }
+  }
+
+  return <>
+    <Problem failure={failure} retry={refresh} />
+    {failure.code === 'APPROVER_SETUP' && <>
+      <button type="button" disabled={activating} onClick={() => void activate()}>
+        {activating ? 'Activando rol…' : 'Activar revisión para mi cuenta'}
+      </button>
+      {activationFailure && <Problem failure={activationFailure} retry={refresh} />}
+    </>}
+  </>;
+}
+
 function JiraLink({ issueKey }: { issueKey: string }) {
   const [unreachable, setUnreachable] = useState(false);
   if (!issueKeyPattern.test(issueKey)) return null;
@@ -135,33 +168,11 @@ const readInbox = () => invoke(DECISIONS_LIST);
 function Inbox({ onOpen }: Pick<Props, 'onOpen'>) {
   const { load, refresh } = useDecisionRead(readInbox);
   const [filter, setFilter] = useState<DecisionStatus | ''>('');
-  const [activating, setActivating] = useState(false);
-  const [activationFailure, setActivationFailure] = useState<Failure>();
   const matched = load.state === 'ready' ? load.data.filter(({ status }) => !filter || status === filter) : [];
-
-  async function activate() {
-    setActivating(true);
-    setActivationFailure(undefined);
-    try {
-      const result = await invoke(DECISIONS_ACTIVATE_APPROVER, { confirmed: true });
-      if (result?.ok) refresh();
-      else setActivationFailure(result ? failureOf(result) : unavailable);
-    } catch {
-      setActivationFailure(unavailable);
-    } finally {
-      setActivating(false);
-    }
-  }
 
   return <>
     {load.state === 'loading' && <p role="status">Cargando propuestas…</p>}
-    {load.state === 'error' && <Problem failure={load.failure} retry={refresh} />}
-    {load.state === 'error' && load.failure.code === 'APPROVER_SETUP' && <>
-      <button type="button" disabled={activating} onClick={() => void activate()}>
-        {activating ? 'Activando rol…' : 'Activar revisión para mi cuenta'}
-      </button>
-      {activationFailure && <Problem failure={activationFailure} />}
-    </>}
+    {load.state === 'error' && <DecisionReadProblem failure={load.failure} refresh={refresh} />}
     {load.state === 'ready' && <>
       {load.data.length > 0 && <div className="dec-inbox-tools">
         <label className="dec-field">Estado
@@ -301,7 +312,7 @@ function DecisionDetail({ decisionId, onOpenRun }: { decisionId: string } & Pick
   }
 
   if (load.state === 'loading') return <p role="status">Cargando la propuesta…</p>;
-  if (load.state === 'error') return <Problem failure={load.failure} retry={update} />;
+  if (load.state === 'error') return <DecisionReadProblem failure={load.failure} refresh={update} />;
   const decision = load.data;
   const busy = action !== undefined;
   const canReview = !refreshRequired && decision.canReview && decision.status === 'PROPOSED' && !decision.isMine;
@@ -400,7 +411,8 @@ function DecisionDetail({ decisionId, onOpenRun }: { decisionId: string } & Pick
       <h3 id="dec-confirm-title" ref={confirmHeading} tabIndex={-1}>Confirmar creación en Jira</h3>
       <p>Jira recibirá la revisión {decision.revision} aprobada para {decision.target.projectKey} con tu cuenta.</p>
       <div className="dec-actions">
-        <button type="button" disabled={busy} onClick={() => void mutate('execute', () => invoke(DECISIONS_EXECUTE, reference))}>
+        <button type="button" disabled={busy} onClick={() => void mutate('execute', () =>
+          invoke(DECISIONS_EXECUTE, { ...reference, expectedAttempt: decision.attemptCount }))}>
           {action === 'execute' ? 'Solicitando creación…' : 'Confirmar creación de incidencia'}
         </button>
         <button type="button" className="dec-secondary" disabled={busy} onClick={() => setConfirmCreate(false)}>Volver</button>

@@ -265,9 +265,13 @@ export function createDecisionStore(query: typeof executeSql = executeSql) {
     return changed;
   }
 
-  async function reserveExecution(input: DecisionRef): Promise<DecisionRow | undefined> {
+  async function reserveExecution(input: DecisionRef & { expectedAttempt: number }): Promise<DecisionRow | undefined> {
+    if (!Number.isSafeInteger(input.expectedAttempt) || input.expectedAttempt < 0) {
+      throw new DecisionStoreError('INVALID_REQUEST');
+    }
     const prior = await getDecision(input.projectId, input.decisionId);
     if (!prior || prior.proposed_by !== input.actor || prior.revision !== input.revision || prior.payload_hash !== input.payloadHash ||
+        prior.attempt_count !== input.expectedAttempt ||
         (prior.status !== 'APPROVED' && (prior.status !== 'FAILED' || prior.failure_class !== 'DEFINITE'))) return;
     const priorFailureEventId = prior.status === 'FAILED'
       ? auditId(prior.id, prior.revision, 'execution_failed', prior.attempt_count) : null;
@@ -278,10 +282,10 @@ export function createDecisionStore(query: typeof executeSql = executeSql) {
         attempt_count = attempt_count + 1, execution_started_at = UTC_TIMESTAMP(3), execution_finished_at = NULL,
         last_error_code = NULL, failure_class = NULL, updated_at = UTC_TIMESTAMP(3)
        WHERE ${scopedReference} AND proposed_by = ? AND attempt_count = ? AND ${activeProject} AND ${planner} AND ${retainedApproval}
-         AND (status = 'APPROVED' OR (status = 'FAILED' AND failure_class = 'DEFINITE'
+         AND ((status = 'APPROVED' AND attempt_count = 0) OR (status = 'FAILED' AND attempt_count > 0 AND failure_class = 'DEFINITE'
            AND EXISTS (SELECT 1 FROM ctx_audit_log audit WHERE audit.id = ? AND audit.project_id = ctx_decision.project_id
              AND audit.entity_id = ctx_decision.id AND audit.event_type = 'decision.execution_failed')))`,
-      [token, ...referenceValues(input), input.actor, prior.attempt_count, priorFailureEventId],
+      [token, ...referenceValues(input), input.actor, input.expectedAttempt, priorFailureEventId],
     );
     if (!changed) return;
     const reserved = await repairCurrent(input.projectId, input.decisionId);
