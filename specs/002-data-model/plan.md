@@ -20,7 +20,7 @@ Timestamp de corte, semilla y versión fijos. Construir DAG válido y plantar A-
 
 ### R002-04 · Bootstrap protegido
 
-Mostrar destino, volumen y consecuencias antes de confirmar. Exigir ADMIN, acceso Jira y proyecto dedicado. Guardar manifiesto de progreso y reconciliar tras respuestas perdidas.
+Mostrar destino, volumen y consecuencias antes de confirmar. Exigir ADMIN, acceso Jira y proyecto dedicado. Guardar manifiesto de progreso y reconciliar tras respuestas perdidas. El sitio y el proyecto se vinculan en la configuración de development y se verifican en cada llamada. [ADR-005](../../docs/decisions/REGISTRO_ADR.md#adr-005--destino-de-la-carga-inicial).
 
 ### R002-05 · Aislamiento y retención
 

@@ -1,7 +1,15 @@
 import { makeInvoke, view } from '@forge/bridge';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HEALTH_OPERATION, type HealthResponse, type HealthStatus } from '../../../src/shared/health.js';
+import { DemoBootstrap } from './demo-bootstrap';
+import { DecisionsDashboard } from './decisions';
+import { IntegrationsPanel } from './integrations-panel';
+import { OverviewDashboard } from './overview';
+import { OperationsDashboard } from './operations';
+import { FuturosRunner } from './futuros-runner';
+import type { OperationsTarget } from '../../../src/shared/operations';
+import { projectPath, projectRoute, type ProjectRoute } from '../../../src/shared/futuros-navigation';
 import './styles.css';
 
 const invoke = makeInvoke<{ [HEALTH_OPERATION]: () => HealthResponse | undefined }>();
@@ -17,7 +25,7 @@ const statusLabels: Record<HealthStatus, string> = {
   UNAVAILABLE: 'No disponible',
 };
 
-function App() {
+function ForgeConnection() {
   const [attempt, setAttempt] = useState(0);
   const [check, setCheck] = useState<HealthCheck>({ state: 'loading' });
 
@@ -54,8 +62,7 @@ function App() {
   }
 
   return (
-    <main className="page">
-      <h1>Control Tower X</h1>
+    <>
       <section className="connection" aria-labelledby="connection-heading">
         <h2 id="connection-heading">Conexión con Forge</h2>
         <div className="connection-result" role="status" aria-atomic="true">
@@ -87,6 +94,70 @@ function App() {
         </div>
         {retryable && <button type="button" onClick={retry}>Reintentar</button>}
       </section>
+      {response?.ok && response.data.status === 'READY' && <><IntegrationsPanel /><DemoBootstrap /></>}
+    </>
+  );
+}
+
+function App() {
+  const [hasOpenedTools, setHasOpenedTools] = useState(false);
+  const [route, setRoute] = useState<ProjectRoute>({ view: 'overview' });
+  const [target, setTarget] = useState<OperationsTarget>();
+  const history = useRef<Awaited<ReturnType<typeof view.createHistory>>>(null);
+  const operationsNavigation = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void view.createHistory().then((navigation) => {
+      if (!active) return;
+      history.current = navigation;
+      setRoute(projectRoute(navigation.location.pathname));
+      unlisten = navigation.listen(({ pathname }) => setRoute(projectRoute(pathname)));
+    }).catch(() => undefined);
+    return () => { active = false; unlisten?.(); history.current = null; };
+  }, []);
+
+  function navigate(next: ProjectRoute) {
+    setRoute(next);
+    const pathname = projectPath(next);
+    if (history.current?.location.pathname !== pathname) history.current?.push(pathname);
+  }
+
+  function openOperations(next?: OperationsTarget) {
+    setTarget(next);
+    navigate({ view: 'operations' });
+    operationsNavigation.current?.focus();
+  }
+
+  return (
+    <main className="page">
+      <nav className="app-navigation" aria-label="Vistas de Control Tower X">
+        <button type="button" aria-current={route.view === 'overview' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'overview' })}>Vista general</button>
+        <button type="button" ref={operationsNavigation} aria-current={route.view === 'operations' ? 'page' : undefined}
+          onClick={() => openOperations()}>Explorar proyecto</button>
+        <button type="button" aria-current={route.view === 'futuros' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'futuros' })}>Futuros</button>
+        <button type="button" aria-current={route.view === 'decisions' ? 'page' : undefined}
+          onClick={() => navigate({ view: 'decisions' })}>Decisiones</button>
+      </nav>
+      {route.view === 'overview' && <OverviewDashboard onOpenLogistics={(code) => openOperations({ section: 'logistics', code })} />}
+      {route.view === 'operations' && <OperationsDashboard initialTarget={target} />}
+      {route.view === 'futuros' && <FuturosRunner focusedRunId={route.runId}
+        onFocusRun={(runId) => navigate({ view: 'futuros', runId })}
+        onPrepareDecision={(runId) => navigate({ view: 'decisions', runId })} />}
+      {route.view === 'decisions' && <DecisionsDashboard decisionId={route.decisionId} runId={route.runId}
+        onOpen={(decisionId) => navigate({ view: 'decisions', decisionId })} onBack={() => navigate({ view: 'decisions' })}
+        onOpenRun={(runId) => navigate({ view: 'futuros', runId })} />}
+      <details className="installation-tools" onToggle={(event) => {
+        if (event.currentTarget.open) {
+          setHasOpenedTools(true);
+        }
+      }}>
+        <summary>Estado de la instalación</summary>
+        {hasOpenedTools && <ForgeConnection />}
+      </details>
     </main>
   );
 }

@@ -5,15 +5,184 @@ modules:
       resource: project-ui
       resolver:
         function: project-resolver
+  rovo:agent:
+    - key: control-tower-agent-x
+      name: Agent X
+      description: Explica A-17 y los resultados publicados de Futuros con evidencia verificable.
+      prompt: resource:agent-x-resources;prompts/agent-x.txt
+      conversationStarters:
+        - ¿Qué explica el retraso de A-17 en el proyecto PED?
+        - ¿Qué necesito para comparar el plan base y la mitigación en Futuros?
+      actions:
+        - read-project-evidence
+        - read-operational-exposure
+        - search-project-knowledge
+        - read-futuros-result
+        - compare-futuros-results
+  action:
+    - key: read-project-evidence
+      name: Leer estado del proyecto
+      description: Consulta indicadores y evidencia visible del proyecto. Usá el filtro a17 para explicar su cadena de impacto.
+      actionVerb: GET
+      function: project-evidence-fn
+      inputs:
+        jiraProjectId:
+          title: Proyecto Jira
+          description: ID numérico del proyecto o clave explícita PED para el proyecto demo.
+          type: string
+          required: true
+        filter:
+          title: Vista solicitada
+          description: Una de summary, overdue, milestones o a17. Sin filtro usa summary.
+          type: string
+          required: false
+    - key: read-operational-exposure
+      name: Leer exposición operativa
+      description: Consulta activos, logística, contratistas, HSE o finanzas visibles para la persona.
+      actionVerb: GET
+      function: read-operational-fn
+      inputs:
+        jiraProjectId:
+          title: Proyecto Jira
+          description: ID numérico del proyecto o clave explícita PED para el proyecto demo.
+          type: string
+          required: true
+        focus:
+          title: Área operativa
+          description: Una de assets, logistics, contractors, hse o financial.
+          type: string
+          required: true
+        itemRef:
+          title: Código operativo
+          description: Código exacto del elemento que la persona solicita, cuando lo proporcionó.
+          type: string
+          required: false
+    - key: search-project-knowledge
+      name: Buscar conocimiento del proyecto
+      description: Busca evidencia de conocimiento visible. Informa el alcance de la fuente y su disponibilidad.
+      actionVerb: GET
+      function: search-knowledge-fn
+      inputs:
+        jiraProjectId:
+          title: Proyecto Jira
+          description: ID numérico del proyecto o clave explícita PED para el proyecto demo.
+          type: string
+          required: true
+        query:
+          title: Texto de búsqueda
+          description: Términos de búsqueda en texto simple de hasta 160 caracteres.
+          type: string
+          required: true
+        source:
+          title: Fuente solicitada
+          description: Fuente opcional. local consulta el catálogo de la app y confluence consulta su disponibilidad.
+          type: string
+          required: false
+    - key: read-futuros-result
+      name: Leer resultado de Futuros
+      description: Consulta el resultado agregado publicado y la referencia verificable de una corrida accesible.
+      actionVerb: GET
+      function: read-futuros-result-fn
+      inputs:
+        jiraProjectId:
+          title: Proyecto Jira
+          description: ID numérico del proyecto o clave explícita PED para el proyecto demo.
+          type: string
+          required: true
+        runId:
+          title: UUID de la corrida
+          description: Identificador exacto de la corrida publicada que la persona quiere consultar.
+          type: string
+          required: true
+    - key: compare-futuros-results
+      name: Comparar resultados de Futuros
+      description: Consulta diferencias calculadas entre una corrida base y hasta dos alternativas compatibles y publicadas.
+      actionVerb: GET
+      function: compare-futuros-fn
+      inputs:
+        jiraProjectId:
+          title: Proyecto Jira
+          description: ID numérico del proyecto o clave explícita PED para el proyecto demo.
+          type: string
+          required: true
+        baseRunId:
+          title: UUID de corrida base
+          description: Identificador exacto de la corrida de referencia, normalmente S0.
+          type: string
+          required: true
+        candidateRunId:
+          title: UUID de la primera alternativa
+          description: Identificador exacto de la primera corrida alternativa.
+          type: string
+          required: true
+        secondCandidateRunId:
+          title: UUID de la segunda alternativa
+          description: Identificador exacto de una segunda corrida alternativa, cuando se solicita.
+          type: string
+          required: false
   function:
     - key: project-resolver
       handler: index.handler
+    - key: read-futuros-result-fn
+      handler: server/agent-x/read-run.readFuturosResult
+    - key: project-evidence-fn
+      handler: server/agent-x/project-evidence.readProjectEvidence
+    - key: read-operational-fn
+      handler: server/agent-x/operations-evidence.readOperationalExposure
+    - key: search-knowledge-fn
+      handler: server/agent-x/operations-evidence.searchProjectKnowledge
+    - key: compare-futuros-fn
+      handler: server/agent-x/compare-runs.compareFuturosResults
+    - key: enq-schema-migrations
+      handler: server/data/migration-events.enqueue
+    - key: maintain-demo-data
+      handler: server/data/migration-events.maintain
+    - key: run-schema-migrations
+      handler: server/data/migration-events.run
+      timeoutSeconds: 900
+    - key: publish-patagonia
+      handler: server/data/bootstrap/publish.publish
+      timeoutSeconds: 180
+    - key: run-futuros
+      handler: server/futuros/runtime.runFuturos
+      timeoutSeconds: 120
+    - key: recover-futuros-runs
+      handler: server/futuros/runtime.recoverFuturos
+  sql:
+    - key: control-tower-db
+      engine: mysql
+  trigger:
+    - key: initialize-sql-schema
+      function: enq-schema-migrations
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+  consumer:
+    - key: consume-schema-migrations
+      queue: ctx-schema-migrations
+      function: run-schema-migrations
+    - key: consume-patagonia-fixture
+      queue: ctx-fixture-publish
+      function: publish-patagonia
+    - key: consume-futuros
+      queue: ctx-futuros
+      function: run-futuros
+  scheduledTrigger:
+    - key: retry-schema-migrations
+      function: maintain-demo-data
+      interval: hour
+    - key: retry-futuros-runs
+      function: recover-futuros-runs
+      interval: fiveMinute
 resources:
   - key: project-ui
     path: static/control-tower/dist
+  - key: agent-x-resources
+    path: static/agent
 permissions:
   scopes:
     - read:jira-work
+    - write:jira-work
 app:
   runtime:
     name: nodejs22.x
