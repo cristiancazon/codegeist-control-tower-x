@@ -13,7 +13,7 @@
 | ADR-009 | Aplicada en development | Publicar revisiones inmutables de A-17 con validación de la revisión de origen y acceso vigente. Usar referencias de corrida para navegar y consultar Agent X | SDD-006 / AC006-01 a AC006-04 |
 | ADR-010 | Aplicada en development | Exponer a Agent X cinco acciones de lectura con identidad de Forge, comprobación de acceso vigente y proyección explícita de procedencia | SDD-007 / AC007-01 a AC007-04 |
 | ADR-011 | Aplicada en development | Observar capacidades de la instalación con la cuenta activa y exigir opt-in por fuente | SDD-008 / AC008-01 a AC008-04 |
-| ADR-012 | Implementada | Congelar la propuesta y reservar la creación de Jira tras una aprobación por una cuenta distinta | SDD-009 / AC009-01 a AC009-04 |
+| ADR-012 | Verificada en development | Congelar la propuesta y reservar la creación de Jira tras una aprobación por una cuenta distinta | SDD-009 / AC009-01 a AC009-04 |
 
 Para cada nueva ADR, registrar fecha, estado, contexto, decisión, alternativas evaluadas, consecuencias, mitigaciones, condición para revisarla, fuentes oficiales y criterios SDD afectados. Enlazar el registro desde el spec que adopta la decisión.
 

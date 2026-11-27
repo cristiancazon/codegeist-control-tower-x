@@ -7,7 +7,7 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Dependencias declaradas del spec.
 - Entrega. Preparar checklist de entrega, resumen de cambios y matriz de riesgos.
 - Verificación. Ejecutar [CT010-01](tests.md#ct010-01) y guardar evidencia de [AC010-01](acceptance.md#ac010-01).
-- Estado. Candidato técnico `50121f8` reconstruido en CI, desplegado y verificado en staging. Reglas contrastadas. La candidatura final requiere las evidencias reales de revisión y creación.
+- Estado. Candidato técnico `50121f8` reconstruido en CI y verificado en staging. Reglas contrastadas. El recorrido de aprobación y creación ya tiene evidencia en Forge development.
 
 ### T010-02 · Instalación como jurado
 
@@ -21,7 +21,7 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T010-02`.
 - Entrega. Cronometrar dos ensayos, capturar evidencias y producir el vídeo y las instrucciones.
 - Verificación. Ejecutar [CT010-03](tests.md#ct010-03) y guardar evidencia de [AC010-03](acceptance.md#ac010-03).
-- Estado. Guion e instrucciones en inglés preparados. Quedan pendientes dos ensayos completos con cuentas distintas y el video real.
+- Estado. Guion e instrucciones en inglés preparados. Aprobación, creación y restricción por cuenta verificadas en development. Quedan pendientes dos recorridos cronometrados y el video real.
 
 ### T010-04 · Liberación y entrega
 

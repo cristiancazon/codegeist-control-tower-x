@@ -37,7 +37,7 @@ Under these assumptions, the alternate supply scenario brings P80 schedule back 
 | **AI assistant** | Atlassian Rovo with five read-only Forge actions for project evidence and published simulations. [Agent X evidence](specs/007-agent-x/tests.md) · [Rovo agent module](https://developer.atlassian.com/platform/forge/manifest-reference/modules/rovo-agent/) |
 | **Quality** | ESLint, TypeScript, the Node.js test runner and GitHub Actions. The release candidate passed 156 automated tests and a smoke test in Forge staging. [Release evidence](specs/010-release/tests.md) |
 
-The Jira and Rovo profile is verified on the demo site. The optional Confluence, Jira Service Management, Assets, Rovo MCP, Teamwork Graph and Rovo Skills capabilities are disabled in that profile. The A-17 proposal was confirmed in Jira development. A live review by a second account and corrective work item creation remain part of acceptance testing. [Integration evidence](specs/008-rovo-integrations/tests.md) · [Decision workflow evidence](specs/009-decisions/tests.md)
+The Jira and Rovo profile is verified on the demo site. The optional Confluence, Jira Service Management, Assets, Rovo MCP, Teamwork Graph and Rovo Skills capabilities are disabled in that profile. In Jira development, a separate reviewer approved the A-17 proposal and the planner created **PED-121**. Jira returned exactly one work item for the proposal's correlation label. A Jira user without an app role was denied access to the proposal and Futuros results. [Integration evidence](specs/008-rovo-integrations/tests.md) · [Decision workflow evidence](specs/009-decisions/tests.md)
 
 ### Run the project
 
@@ -92,7 +92,7 @@ Bajo estos supuestos, el suministro alternativo recupera un plazo P80 de 30 día
 | **Asistente de IA** | Atlassian Rovo con cinco acciones Forge de lectura para consultar evidencia del proyecto y simulaciones publicadas. [Evidencia de Agent X](specs/007-agent-x/tests.md) · [Módulo Rovo Agent](https://developer.atlassian.com/platform/forge/manifest-reference/modules/rovo-agent/) |
 | **Calidad** | ESLint, TypeScript, el ejecutor de pruebas de Node.js y GitHub Actions. El candidato aprobó 156 pruebas automatizadas y una verificación básica en Forge staging. [Evidencia de entrega](specs/010-release/tests.md) |
 
-El perfil Jira y Rovo está verificado en el sitio demo. Las funciones opcionales de Confluence, Jira Service Management, Assets, Rovo MCP, Teamwork Graph y Rovo Skills están deshabilitadas en ese perfil. La propuesta de A-17 se confirmó en Jira development. La aprobación por una segunda cuenta y la creación real del correctivo forman parte de las pruebas de aceptación pendientes. [Evidencia de integraciones](specs/008-rovo-integrations/tests.md) · [Evidencia de Decisiones](specs/009-decisions/tests.md)
+El perfil Jira y Rovo está verificado en el sitio demo. Las funciones opcionales de Confluence, Jira Service Management, Assets, Rovo MCP, Teamwork Graph y Rovo Skills están deshabilitadas en ese perfil. En Jira development, una cuenta revisora distinta aprobó la propuesta de A-17 y el planificador creó **PED-121**. Jira devolvió un solo ítem para la etiqueta de correlación de la propuesta. La app denegó el acceso a la propuesta y a los resultados de Futuros a una cuenta Jira sin rol en Control Tower X. [Evidencia de integraciones](specs/008-rovo-integrations/tests.md) · [Evidencia de Decisiones](specs/009-decisions/tests.md)
 
 ### Empezar
 
