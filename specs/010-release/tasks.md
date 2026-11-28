@@ -14,7 +14,7 @@ Cada tarea entrega código y evidencia en la etapa de implementación. Mantener 
 - Dependencia. Revisar salida de `T010-01`.
 - Entrega. Ensayar en sitio comparable, corregir accesos y documentar las instrucciones verificadas.
 - Verificación. Ejecutar [CT010-02](tests.md#ct010-02) y guardar evidencia de [AC010-02](acceptance.md#ac010-02).
-- Estado. Procedimiento documentado. Verificada la actualización de la instalación staging previa y el destino cerrado por defecto. Queda pendiente el ensayo desde un sitio fresco y el enlace para el jurado.
+- Estado. Forge staging se instaló en un sitio Jira nuevo. PED se configuró con acceso limitado y el plan de carga confirmó 0 de 120 ítems. Quedan pendientes la carga, la validación con cuentas distintas y el enlace para el jurado.
 
 ### T010-03 · Ensayo y evidencia
 
